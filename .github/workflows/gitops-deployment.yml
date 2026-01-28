@@ -1,0 +1,125 @@
+name: GitOps Deployment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/prod.txt'
+      - '**/stg.txt'
+
+concurrency:
+  group: gitops-deployment
+  cancel-in-progress: false
+
+env:
+  CONFIG_FILE: .github/config/values-config.json
+
+jobs:
+  detect-and-build:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+      has_deployments: ${{ steps.build.outputs.has_deployments }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect Changes and Build Matrix
+        id: build
+        run: |
+          # Get changed txt files
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.event.after }}"
+
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            CHANGED=$(git diff-tree --no-commit-id --name-only -r "$AFTER" | grep -E '(prod|stg)\.txt$' || true)
+          else
+            CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" | grep -E '(prod|stg)\.txt$' || true)
+          fi
+
+          if [ -z "$CHANGED" ]; then
+            echo "has_deployments=false" >> $GITHUB_OUTPUT
+            echo "matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          CONFIG=$(cat "${{ env.CONFIG_FILE }}")
+          > /tmp/matrix.json
+
+          while IFS= read -r file; do
+            [ -z "$file" ] || [ ! -f "$file" ] && continue
+
+            # Parse path segments
+            SEGMENTS=$(echo "$file" | tr '/' '\n' | wc -l)
+            if [ "$SEGMENTS" -eq 3 ]; then
+              SVC=$(echo "$file" | cut -d'/' -f1)
+              TYPE=$(echo "$file" | cut -d'/' -f2)
+              VER=""
+            elif [ "$SEGMENTS" -eq 4 ]; then
+              SVC=$(echo "$file" | cut -d'/' -f1)
+              TYPE=$(echo "$file" | cut -d'/' -f2)
+              VER=$(echo "$file" | cut -d'/' -f3)
+            else
+              continue
+            fi
+            ENV=$(basename "$file" .txt)
+
+            # Read last non-empty line (append-only files)
+            IMG=$(grep -v '^[[:space:]]*$' "$file" | tail -n 1)
+            [ -z "$IMG" ] && continue
+            REPO=$(echo "$IMG" | rev | cut -d':' -f2- | rev)
+            TAG=$(echo "$IMG" | rev | cut -d':' -f1 | rev)
+
+            # Lookup config
+            VCFG=$(echo "$CONFIG" | jq -c --arg s "$SVC" --arg t "$TYPE" --arg v "$VER" \
+              '.[$s][$t][] | select(.version == $v) // empty')
+            [ -z "$VCFG" ] && continue
+
+            VFILE=$(echo "$VCFG" | jq -r '.file')
+            CLUSTERS=$(echo "$VCFG" | jq -c --arg e "$ENV" '.cluster[$e] // []')
+            [ "$CLUSTERS" = "[]" ] && continue
+
+            # Add matrix entry for each cluster
+            echo "$CLUSTERS" | jq -c '.[]' | while read -r c; do
+              jq -n --arg svc "$SVC" --arg type "$TYPE" --arg ver "$VER" --arg env "$ENV" \
+                    --arg cluster "$(echo $c | tr -d '\"')" --arg vf "$VFILE" \
+                    --arg repo "$REPO" --arg tag "$TAG" \
+                '{service_name:$svc,service_type:$type,version:$ver,environment:$env,cluster:$cluster,values_file:$vf,image_repo:$repo,image_tag:$tag}' >> /tmp/matrix.json
+            done
+          done <<< "$CHANGED"
+
+          if [ -s /tmp/matrix.json ]; then
+            MATRIX=$(jq -sc '{include:.}' /tmp/matrix.json)
+            echo "has_deployments=true" >> $GITHUB_OUTPUT
+          else
+            MATRIX='{"include":[]}'
+            echo "has_deployments=false" >> $GITHUB_OUTPUT
+          fi
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+          # Summary
+          echo "### Deployment Matrix" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          echo "$MATRIX" | jq '.' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  deploy:
+    needs: detect-and-build
+    if: needs.detect-and-build.outputs.has_deployments == 'true'
+    strategy:
+      matrix: ${{ fromJson(needs.detect-and-build.outputs.matrix) }}
+      fail-fast: false
+      max-parallel: 4
+    uses: ./.github/workflows/update-gitops.yml
+    with:
+      service_name: ${{ matrix.service_name }}
+      service_type: ${{ matrix.service_type }}
+      version: ${{ matrix.version }}
+      environment: ${{ matrix.environment }}
+      cluster: ${{ matrix.cluster }}
+      values_file: ${{ matrix.values_file }}
+      image_repo: ${{ matrix.image_repo }}
+      image_tag: ${{ matrix.image_tag }}
+    secrets: inherit
