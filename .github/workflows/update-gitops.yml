@@ -138,11 +138,9 @@ jobs:
               if git pull --rebase origin ${{ env.GITOPS_BRANCH }}; then
                 echo "Rebase successful"
               else
-                if git diff --name-only --diff-filter=U | grep -q "$VALUES_PATH"; then
-                  echo "::error::Conflict in target values file"
-                  exit 1
-                fi
-                git add -A && git rebase --continue || true
+                echo "::error::Rebase failed due to conflicts. Manual intervention required."
+                git rebase --abort
+                exit 1
               fi
 
               WAIT=$((BASE_DELAY * RETRY + RANDOM % 3))
