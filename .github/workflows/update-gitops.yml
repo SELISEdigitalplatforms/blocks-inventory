@@ -103,7 +103,7 @@ jobs:
           VER_INFO="${{ inputs.version }}"
           [ -n "$VER_INFO" ] && VER_INFO=" ($VER_INFO)"
 
-          git commit -m "Update ${{ inputs.service_name }}-${{ inputs.service_type }}${VER_INFO} for ${{ inputs.environment }}
+          git commit -m "🚀 Update ${{ inputs.service_name }}-${{ inputs.service_type }}${VER_INFO} for ${{ inputs.environment }}
 
           Service: ${{ inputs.service_name }}
           Type: ${{ inputs.service_type }}
