@@ -1,0 +1,157 @@
+name: Update GitOps Repository
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+      service_type:
+        required: true
+        type: string
+      version:
+        required: false
+        type: string
+        default: ""
+      environment:
+        required: true
+        type: string
+      cluster:
+        required: true
+        type: string
+      values_file:
+        required: true
+        type: string
+      image_repo:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+
+env:
+  GITOPS_REPO: SELISEdigitalplatforms/l0-yml-argo-helm
+  GITOPS_BRANCH: main
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: gitops-${{ inputs.cluster }}-${{ inputs.values_file }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout GitOps Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          token: ${{ secrets.SELISE_GITHUB_PAT }}
+          ref: ${{ env.GITOPS_BRANCH }}
+
+      - name: Setup Git
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "github-actions-bot@selisegroup.com"
+
+      - name: Update Values File
+        id: update
+        run: |
+          VALUES_PATH="${{ inputs.cluster }}/${{ inputs.values_file }}"
+
+          # Summary header
+          echo "### GitOps Update" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | ${{ inputs.service_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Type | ${{ inputs.service_type }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | ${{ inputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Cluster | ${{ inputs.cluster }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Values File | $VALUES_PATH |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ ! -f "$VALUES_PATH" ]; then
+            echo "::error::Values file not found: $VALUES_PATH"
+            exit 1
+          fi
+
+          # Backup and update
+          cp "$VALUES_PATH" "${VALUES_PATH}.bak"
+          yq eval ".image.repository = \"${{ inputs.image_repo }}\"" -i "$VALUES_PATH"
+          yq eval ".image.tag = \"${{ inputs.image_tag }}\"" -i "$VALUES_PATH"
+
+          # Check for changes
+          if diff -q "$VALUES_PATH" "${VALUES_PATH}.bak" > /dev/null; then
+            echo "modified=false" >> $GITHUB_OUTPUT
+            echo "No changes needed (already up to date)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "modified=true" >> $GITHUB_OUTPUT
+            echo "### Changes" >> $GITHUB_STEP_SUMMARY
+            echo '```diff' >> $GITHUB_STEP_SUMMARY
+            diff "${VALUES_PATH}.bak" "$VALUES_PATH" >> $GITHUB_STEP_SUMMARY || true
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+          rm "${VALUES_PATH}.bak"
+
+      - name: Commit and Push
+        if: steps.update.outputs.modified == 'true'
+        run: |
+          VALUES_PATH="${{ inputs.cluster }}/${{ inputs.values_file }}"
+          git add "$VALUES_PATH"
+
+          # Commit message
+          VER_INFO="${{ inputs.version }}"
+          [ -n "$VER_INFO" ] && VER_INFO=" ($VER_INFO)"
+
+          git commit -m "Update ${{ inputs.service_name }}-${{ inputs.service_type }}${VER_INFO} for ${{ inputs.environment }}
+
+          Service: ${{ inputs.service_name }}
+          Type: ${{ inputs.service_type }}
+          Version: ${{ inputs.version }}
+          Environment: ${{ inputs.environment }}
+          Cluster: ${{ inputs.cluster }}
+          Image: ${{ inputs.image_repo }}:${{ inputs.image_tag }}
+          Triggered by: ${{ github.repository }}@${{ github.sha }}"
+
+          # Retry logic with exponential backoff
+          MAX_RETRIES=5
+          RETRY=0
+          BASE_DELAY=3
+
+          while [ $RETRY -lt $MAX_RETRIES ]; do
+            ATTEMPT=$((RETRY + 1))
+
+            if git push origin ${{ env.GITOPS_BRANCH }}; then
+              echo "### Push Status" >> $GITHUB_STEP_SUMMARY
+              echo "- **Status:** Success" >> $GITHUB_STEP_SUMMARY
+              echo "- **Attempts:** $ATTEMPT" >> $GITHUB_STEP_SUMMARY
+              echo "- **Image:** ${{ inputs.image_repo }}:${{ inputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**ArgoCD will sync this change automatically**" >> $GITHUB_STEP_SUMMARY
+              exit 0
+            fi
+
+            RETRY=$((RETRY + 1))
+            if [ $RETRY -lt $MAX_RETRIES ]; then
+              echo "Push failed, rebasing and retrying..."
+
+              if git pull --rebase origin ${{ env.GITOPS_BRANCH }}; then
+                echo "Rebase successful"
+              else
+                if git diff --name-only --diff-filter=U | grep -q "$VALUES_PATH"; then
+                  echo "::error::Conflict in target values file"
+                  exit 1
+                fi
+                git add -A && git rebase --continue || true
+              fi
+
+              WAIT=$((BASE_DELAY * RETRY + RANDOM % 3))
+              echo "Waiting ${WAIT}s before retry..."
+              sleep $WAIT
+            fi
+          done
+
+          echo "::error::Failed to push after $MAX_RETRIES attempts"
+          echo "### Push Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Failed after $MAX_RETRIES attempts" >> $GITHUB_STEP_SUMMARY
+          exit 1

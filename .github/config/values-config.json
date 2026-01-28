@@ -1,0 +1,20 @@
+{
+  "blocks-localization-net": {
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-localization-net-worker.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
+  }
+}
