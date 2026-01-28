@@ -45,6 +45,11 @@ jobs:
             exit 0
           fi
 
+          if [ ! -f "${{ env.CONFIG_FILE }}" ]; then
+            echo "::error::Config file not found: ${{ env.CONFIG_FILE }}"
+            exit 1
+          fi
+
           CONFIG=$(cat "${{ env.CONFIG_FILE }}")
           > /tmp/matrix.json
 
