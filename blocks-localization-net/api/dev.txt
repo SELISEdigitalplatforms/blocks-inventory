@@ -1,1 +1,2 @@
 blocksos/dev-blocks-localization-net-api:e631d76-26.02.8
+blocksos/dev-blocks-localization-net-api:103833d-26.02.10
