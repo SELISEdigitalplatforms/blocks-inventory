@@ -15,6 +15,22 @@
           ]
         }
       }
+    ],
+    "api": [
+      {
+        "version": "v1",
+        "file": "blocks-localization-net-api-v1.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
     ]
   }
 }
