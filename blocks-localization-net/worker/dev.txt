@@ -1,1 +1,2 @@
 blocksos/dev-blocks-localization-net-worker:e631d76-26.02.8
+blocksos/dev-blocks-localization-net-worker:103833d-26.02.9
