@@ -18,7 +18,7 @@
     ],
     "api": [
       {
-        "version": "v1",
+        "version": "",
         "file": "blocks-localization-net-api-v1.values.yaml",
         "cluster": {
           "prod": [
