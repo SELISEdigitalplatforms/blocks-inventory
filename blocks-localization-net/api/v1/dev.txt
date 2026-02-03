@@ -1,1 +1,2 @@
 blocksos/dev-blocks-localization-net-api:2ee25f5-26.02.12
+blocksos/dev-blocks-localization-net-api:de15a81-26.02.13
