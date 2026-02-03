@@ -1,1 +1,2 @@
 348e19f-26.02.11
+blocksos/dev-blocks-localization-net-worker:2ee25f5-26.02.12
