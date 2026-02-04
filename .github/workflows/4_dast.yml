@@ -28,7 +28,7 @@ jobs:
         run: |
           echo "Creating new ZAP session..."
           curl "$ZAP_API/JSON/core/action/newSession/?apikey=$ZAP_KEY&name=dev-api&overwrite=true" > /dev/null
-          
+
       - name: Access target URL
         run: |
           echo "Accessing target URL to populate ZAP session..."
@@ -63,6 +63,16 @@ jobs:
         run: |
           echo "Downloading Report..."
           curl -s "$ZAP_API/OTHER/core/other/xmlreport/?apikey=$ZAP_KEY" -o "$REPORT_FILE"
+
+      - name: Checkout script from external repo
+        uses: actions/checkout@v4
+        with:
+          repository: SELISEdigitalplatforms/blocks-inventory 
+          ref: main                         # Replace with branch/tag
+          path: .github/scripts/           # Download into this folder
+          sparse-checkout: |
+            .github/scripts/compute_zap_severity.py
+          sparse-checkout-cone-mode: false
 
       - name: Compute ZAP severity counts
         if: always()
