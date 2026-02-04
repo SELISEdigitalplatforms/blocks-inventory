@@ -285,7 +285,7 @@ jobs:
               git add "${TARGET_FILE}"
               git commit -m "Update ${SERVICE_NAME}-${SERVICE_TYPE} ${TARGET_ENV} to ${semantic_version}" || true
 
-              MAX_RETRIES=5
+              MAX_RETRIES=5 
               RETRY=0
               BASE_DELAY=3
               while [ $RETRY -lt $MAX_RETRIES ]; do
