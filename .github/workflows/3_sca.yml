@@ -1,0 +1,233 @@
+name: Perform SCA Scan
+
+on:
+  workflow_call:
+    secrets:
+      DEPENDENCY_TRACK_API_KEY:
+        required: true
+permissions:
+  contents: read
+
+jobs:
+  sca-scan:
+    name: Generate SBOM and Upload to Dependency-Track
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set Environment Variables
+        uses: ./.github/actions/setvars
+        with:
+          varFilePath: ./.github/variables/vars.env
+
+      - name: Restore Dependencies
+        working-directory: ./src
+        run: | 
+          # dotnet restore "./${{ env.SOLUTION_NAME }}" -s https://api.nuget.org/v3/index.json -s https://nuget.selise.biz/nuget
+          dotnet restore "./${{ env.SOLUTION_NAME }}" --configfile ../config/NuGetPackageSource.Config
+
+      - name: Generate CycloneDX SBOM (JSON) for .NET
+        uses: CycloneDX/gh-dotnet-generate-sbom@697f83d4a29dcc3fb5d78ecb1843d1ee4532a390 # v1
+        with:
+          path: ./src/${{ env.SOLUTION_NAME }}                     
+          json: true                             
+
+      - name: Upload SBOM as a workflow artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom-cyclonedx-json
+          path: bom.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload SBOM to Dependency-Track (action)
+        uses: DependencyTrack/gh-upload-sbom@48feab3080ff9e8f51f4d21861d9fc914eb744f5 # v3.1.0
+        with:
+          serverHostname: 'api-dt.seliseblocks.com'
+          apiKey: ${{ secrets.DEPENDENCY_TRACK_API_KEY }}
+          projectName: ${{ github.event.repository.name }}
+          projectVersion: ${{ github.ref_name }}
+          bomFilename: bom.json
+          autoCreate: true
+
+      # - name: Fetch Dependency-Track findings summary
+      #   if: always()
+      #   shell: bash
+      #   env:
+      #     DTRACK_API_KEY: ${{ secrets.DEPENDENCY_TRACK_API_KEY }}
+      #   run: |
+      #     DTRACK_BASE="https://api-dt.seliseblocks.com"
+      #     PROJECT_NAME="${{ github.event.repository.name }}"
+      #     PROJECT_VERSION="${{ github.ref_name }}"
+
+      #     PROJECT_FILE="dtrack-project.json"
+      #     FINDINGS_FILE="dtrack-findings.json"
+      #     METRICS_FILE="dtrack-metrics.json"
+
+      #     if curl -sS -H "X-Api-Key: ${DTRACK_API_KEY}" \
+      #       "${DTRACK_BASE}/api/v1/project/lookup?name=${PROJECT_NAME}&version=${PROJECT_VERSION}" \
+      #       -o "${PROJECT_FILE}"; then
+      #       PROJECT_UUID="$(jq -r '.uuid // empty' "${PROJECT_FILE}")"
+      #     else
+      #       PROJECT_UUID=""
+      #     fi
+
+      #     if [ -n "${PROJECT_UUID}" ]; then
+      #       for i in 1 2 3 4 5; do
+      #         if curl -sS -H "X-Api-Key: ${DTRACK_API_KEY}" \
+      #           "${DTRACK_BASE}/api/v1/metrics/project/${PROJECT_UUID}/current" \
+      #           -o "${METRICS_FILE}"; then
+      #           CRIT="$(jq -r '.critical // empty' "${METRICS_FILE}")"
+      #           if [ -n "${CRIT}" ] || [ "${i}" -eq 5 ]; then
+      #             echo "dtrack_metrics_file=${METRICS_FILE}" >> "$GITHUB_ENV"
+      #             break
+      #           fi
+      #         fi
+      #         sleep 10
+      #       done
+      #       if [ ! -f "${METRICS_FILE}" ]; then
+      #         if curl -sS -H "X-Api-Key: ${DTRACK_API_KEY}" \
+      #           "${DTRACK_BASE}/api/v1/finding/project/${PROJECT_UUID}/export" \
+      #           -o "${FINDINGS_FILE}"; then
+      #           echo "dtrack_findings_file=${FINDINGS_FILE}" >> "$GITHUB_ENV"
+      #         fi
+      #       fi
+      #     fi
+      - name: Fetch Dependency-Track findings summary
+        if: always()
+        shell: bash
+        env:
+          DTRACK_API_KEY: ${{ secrets.DEPENDENCY_TRACK_API_KEY }}
+        run: |
+          DTRACK_BASE="https://api-dt.seliseblocks.com"
+          PROJECT_NAME="${{ github.event.repository.name }}"
+          PROJECT_VERSION="${{ github.ref_name }}"
+
+          # Get Project UUID
+          PROJECT_JSON=$(curl -sS -H "X-Api-Key: ${DTRACK_API_KEY}" \
+            "${DTRACK_BASE}/api/v1/project/lookup?name=${PROJECT_NAME}&version=${PROJECT_VERSION}")
+          
+          PROJECT_UUID=$(echo "$PROJECT_JSON" | jq -r '.uuid // empty')
+
+          if [ -z "$PROJECT_UUID" ]; then
+            echo "Error: Could not find project UUID in Dependency-Track"
+            exit 0
+          fi
+
+          echo "Project UUID: $PROJECT_UUID"
+
+          # Polling for metrics (Dependency-Track takes time to process the SBOM)
+          # We check if 'lastOccurrence' exists and is not null
+          for i in {1..25}; do
+            echo "Checking metrics (Attempt $i/25)..."
+            METRICS_JSON=$(curl -sS -H "X-Api-Key: ${DTRACK_API_KEY}" "${DTRACK_BASE}/api/v1/metrics/project/${PROJECT_UUID}/current")
+            # FINDING_JSON=$(curl -sS -H "X-Api-Key: ${DTRACK_API_KEY}" "${DTRACK_BASE}/api/v1/finding/project/${PROJECT_UUID}?suppressed=false")
+            # echo "Number of findings retrieved: $(echo "$FINDING_JSON" )"
+            
+            # Check if metrics are actually populated (critical is a good indicator)
+            HAS_METRICS=$(echo "$METRICS_JSON" | jq -r 'if .critical != null then "true" else "false" end')
+            
+            if [ "$HAS_METRICS" == "true" ]; then
+              echo "$METRICS_JSON" > dtrack-metrics.json
+              echo "METRICS_FOUND=true" >> "$GITHUB_ENV"
+              break
+            fi
+            sleep 15
+          done
+
+      # - name: SCA Summary
+      #   if: always()
+      #   shell: bash
+      #   run: |
+      #     METRICS_FILE="${dtrack_metrics_file:-}"
+      #     FINDINGS_FILE="${dtrack_findings_file:-}"
+      #     CRITICAL="n/a"
+      #     HIGH="n/a"
+      #     MEDIUM="n/a"
+      #     LOW="n/a"
+      #     UNASSIGNED="n/a"
+      #     TOTAL="n/a"
+      #     if [ -n "$METRICS_FILE" ] && [ -f "$METRICS_FILE" ]; then
+      #       CRITICAL="$(jq -r '.critical // "n/a"' "$METRICS_FILE")"
+      #       HIGH="$(jq -r '.high // "n/a"' "$METRICS_FILE")"
+      #       MEDIUM="$(jq -r '.medium // "n/a"' "$METRICS_FILE")"
+      #       LOW="$(jq -r '.low // "n/a"' "$METRICS_FILE")"
+      #       UNASSIGNED="$(jq -r '.unassigned // "n/a"' "$METRICS_FILE")"
+      #       TOTAL="$(jq -r '.findingsTotal // "n/a"' "$METRICS_FILE")"
+      #     elif [ -n "$FINDINGS_FILE" ] && [ -f "$FINDINGS_FILE" ]; then
+      #       CRITICAL=0
+      #       HIGH=0
+      #       MEDIUM=0
+      #       LOW=0
+      #       UNASSIGNED=0
+      #       TOTAL="$(jq -r '.findings | length' "$FINDINGS_FILE" 2>/dev/null || echo 0)"
+      #       while read -r sev; do
+      #         case "$sev" in
+      #           CRITICAL) CRITICAL=$((CRITICAL+1)) ;;
+      #           HIGH) HIGH=$((HIGH+1)) ;;
+      #           MEDIUM) MEDIUM=$((MEDIUM+1)) ;;
+      #           LOW) LOW=$((LOW+1)) ;;
+      #           UNASSIGNED|UNKNOWN|"") UNASSIGNED=$((UNASSIGNED+1)) ;;
+      #         esac
+      #       done < <(jq -r '.findings[]? | (.severity // .vulnerability.severity // .analysis.severity // empty) | ascii_upcase' "$FINDINGS_FILE")
+      #     fi
+      #     {
+      #       echo "### SCA Summary"
+      #       echo ""
+      #       echo "- SBOM: \`bom.json\` (CycloneDX JSON)"
+      #       echo "- Artifact: \`sbom-cyclonedx-json\`"
+      #       echo "- Dependency-Track project: \`${{ github.event.repository.name }}\`"
+      #       echo "- Project version: \`${{ github.ref_name }}\`"
+      #       if [ -f "bom.json" ]; then
+      #         echo "- SBOM size: \`$(wc -c < bom.json) bytes\`"
+      #       else
+      #         echo "- SBOM size: \`not found\`"
+      #       fi
+      #       echo "- Vulnerabilities: critical \`${CRITICAL}\`, high \`${HIGH}\`, medium \`${MEDIUM}\`, low \`${LOW}\`, unassigned \`${UNASSIGNED}\` (total \`${TOTAL}\`)"
+      #     } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: SCA Summary
+        if: always()
+        shell: bash
+        run: |
+          # Initialize variables with 0 or N/A
+          CRITICAL="0"; HIGH="0"; MEDIUM="0"; LOW="0"; UNASSIGNED="0"; TOTAL="0"
+          
+          if [ "$METRICS_FOUND" == "true" ] && [ -f "dtrack-metrics.json" ]; then
+            # Using 'or 0' in jq to ensure we never get an empty string
+            CRITICAL=$(jq -r '.critical // 0' dtrack-metrics.json)
+            HIGH=$(jq -r '.high // 0' dtrack-metrics.json)
+            MEDIUM=$(jq -r '.medium // 0' dtrack-metrics.json)
+            LOW=$(jq -r '.low // 0' dtrack-metrics.json)
+            UNASSIGNED=$(jq -r '.unassigned // 0' dtrack-metrics.json)
+            TOTAL=$(jq -r '.findingsTotal // 0' dtrack-metrics.json)
+          else
+            CRITICAL="N/A"; HIGH="N/A"; MEDIUM="N/A"; LOW="N/A"; UNASSIGNED="N/A"; TOTAL="N/A"
+          fi
+
+          {
+            echo "### SCA Summary"
+            echo ""
+            echo "- **SBOM:** \`bom.json\` (CycloneDX JSON)"
+            echo "- **Artifact:** \`sbom-cyclonedx-json\`"
+            echo "- **Dependency-Track project:** [${{ github.event.repository.name }}](https://api-dt.seliseblocks.com/projects/$PROJECT_UUID)"
+            echo "- **Project version:** \`${{ github.ref_name }}\`"
+            
+            if [ -f "bom.json" ]; then
+              echo "- **SBOM size:** \`$(wc -c < bom.json | xargs) bytes\`"
+            fi
+            
+            echo ""
+            echo "| Severity | Count |"
+            echo "| :--- | :--- |"
+            echo "| Critical | **${CRITICAL}** |"
+            echo "| High | **${HIGH}** |"
+            echo "| Medium | **${MEDIUM}** |"
+            echo "| Low | **${LOW}** |"
+            echo "| Unassigned | **${UNASSIGNED}** |"
+            echo "| **Total** | **${TOTAL}** |"
+          } >> "$GITHUB_STEP_SUMMARY"

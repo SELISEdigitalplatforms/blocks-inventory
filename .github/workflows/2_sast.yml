@@ -1,0 +1,230 @@
+name: Analyze Code Quality
+on: 
+  workflow_call:
+    secrets:
+      SONAR_TOKEN:
+        required: true
+      SONAR_GET:
+        required: true
+permissions:
+  contents: read
+  checks: write
+  pull-requests: read
+jobs:
+  build:
+    name: SonarQube Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0  
+
+      - name: Set Environment Variables
+        uses: ./.github/actions/setvars
+        with:
+          varFilePath: ./.github/variables/vars.env
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      
+      - name: Cache SonarCloud packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~\sonar\cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      
+      - name: Cache SonarCloud scanner
+        id: cache-sonar-scanner
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .\.sonar\scanner
+          key: ${{ runner.os }}-sonar-scanner
+          restore-keys: ${{ runner.os }}-sonar-scanner
+      
+      - name: Install SonarCloud scanner
+        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          dotnet tool install --global dotnet-sonarscanner --version 5.5.3
+      
+      - name: Install coverlet
+        run: |
+          dotnet tool install --global coverlet.console 
+         
+      - name: SonarQube Analysis
+        working-directory: ./src
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
+        shell: pwsh
+        run: |
+          dotnet-sonarscanner begin /k:"${{ env.SONAR_KEY }}" /o:"${{ env.AUTHOR }}" /d:sonar.login=${{ secrets.SONAR_TOKEN }} /d:sonar.host.url="${{ env.SONARQUBE_HOST }}" /d:sonar.cs.opencover.reportsPaths=coverage.xml
+          dotnet restore "./${{ env.SOLUTION_NAME }}" -s https://api.nuget.org/v3/index.json -s https://nuget.selise.biz/nuget
+          dotnet build "./${{ env.SOLUTION_NAME }}" --no-incremental
+          coverlet ./XUnitTests/bin/Debug/net6.0/XUnitTests.dll --target "dotnet" --targetargs "test ./${{ env.SOLUTION_NAME }} --no-build" -f=opencover -o="coverage.xml"
+          dotnet-sonarscanner end /d:sonar.login=${{ secrets.SONAR_TOKEN }}
+
+      - name: SonarQube Quality Gate check
+        id: quality-gate
+        uses: sonarsource/sonarqube-quality-gate-action@cb3ed20f9fec62b4c3b8ad9e77656c6adaade913 # master
+        # Force to fail step after specific time.
+        timeout-minutes: 5
+        with:
+          scanMetadataReportFile: src/.sonarqube/out/.sonar/report-task.txt
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONARQUBE_HOST }}
+
+      # - name: Fetch SonarQube metrics
+      #   if: always()
+      #   shell: bash
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      #   run: |
+      #     METRICS_FILE="sonar-metrics.json"
+      #     SONAR_BASE="${SONARQUBE_HOST%/}"
+      #     REPORT_TASK="src/.sonarqube/out/.sonar/report-task.txt"
+      #     CE_TASK_URL=""
+      #     if [ -f "${REPORT_TASK}" ]; then
+      #       CE_TASK_URL="$(awk -F= '/ceTaskUrl/ {print $2}' "${REPORT_TASK}" | tr -d '\r')"
+      #     fi
+      #     if [ -n "${CE_TASK_URL}" ]; then
+      #       for i in 1 2 3 4 5 6; do
+      #         CE_STATUS="$(curl -sS -u "${SONAR_TOKEN}:" "${CE_TASK_URL}" | jq -r '.task.status // empty')"
+      #         if [ "${CE_STATUS}" = "SUCCESS" ]; then
+      #           break
+      #         fi
+      #         sleep 10
+      #       done
+      #     fi
+      #     BRANCH_QUERY="&branch=${GITHUB_REF_NAME}"
+      #     URL="${SONAR_BASE}/api/measures/component?component=${SONAR_KEY}&metricKeys=duplicated_lines_density,duplicated_lines,duplicated_blocks,security_hotspots,security_hotspots_reviewed,security_review_rating,vulnerabilities${BRANCH_QUERY}"
+      #     if curl -sS -u "${SONAR_TOKEN}:" "${URL}" -o "${METRICS_FILE}"; then
+      #       echo "sonar_metrics_file=${METRICS_FILE}" >> "$GITHUB_ENV"
+      #     else
+      #       echo "Failed to fetch SonarQube metrics from ${SONAR_BASE}" >&2
+      #     fi
+
+      # - name: SAST Summary
+      #   if: always()
+      #   shell: bash
+      #   run: |
+      #     METRICS_FILE="${sonar_metrics_file:-}"
+      #     metric_or_na() {
+      #       local key="$1"
+      #       if [ -n "$METRICS_FILE" ] && [ -f "$METRICS_FILE" ]; then
+      #         jq -r --arg k "$key" '.component.measures[]? | select(.metric==$k) | .value' "$METRICS_FILE" | head -n1
+      #       fi
+      #     }
+      #     DUP_DENSITY="$(metric_or_na duplicated_lines_density)"
+      #     DUP_LINES="$(metric_or_na duplicated_lines)"
+      #     DUP_BLOCKS="$(metric_or_na duplicated_blocks)"
+      #     HOTSPOTS="$(metric_or_na security_hotspots)"
+      #     HOTSPOTS_REVIEWED="$(metric_or_na security_hotspots_reviewed)"
+      #     HOTSPOT_RATING="$(metric_or_na security_review_rating)"
+      #     VULNS="$(metric_or_na vulnerabilities)"
+      #     [ -n "$DUP_DENSITY" ] || DUP_DENSITY="n/a"
+      #     [ -n "$DUP_LINES" ] || DUP_LINES="n/a"
+      #     [ -n "$DUP_BLOCKS" ] || DUP_BLOCKS="n/a"
+      #     [ -n "$HOTSPOTS" ] || HOTSPOTS="n/a"
+      #     [ -n "$HOTSPOTS_REVIEWED" ] || HOTSPOTS_REVIEWED="n/a"
+      #     [ -n "$HOTSPOT_RATING" ] || HOTSPOT_RATING="n/a"
+      #     [ -n "$VULNS" ] || VULNS="n/a"
+      #     {
+      #       echo "### SAST (SonarQube) Summary"
+      #       echo ""
+      #       echo "- Project key: \`${SONAR_KEY}\`"
+      #       echo "- Host: \`${SONARQUBE_HOST}\`"
+      #       echo "- Quality Gate step: \`${{ steps.quality-gate.outcome }}\`"
+      #       echo "- Duplications: density \`${DUP_DENSITY}%\`, lines \`${DUP_LINES}\`, blocks \`${DUP_BLOCKS}\`"
+      #       echo "- Security hotspots: \`${HOTSPOTS}\`, reviewed \`${HOTSPOTS_REVIEWED}%\`, rating \`${HOTSPOT_RATING}\`"
+      #       echo "- Vulnerabilities: \`${VULNS}\`"
+      #       echo "- Coverage report: \`coverage.xml\` (generated in \`src\`)"
+      #     } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fetch SonarQube metrics
+        if: always()
+        shell: bash
+        env:
+          SONAR_GET: ${{ secrets.SONAR_GET }}
+        run: |
+          SONAR_BASE="${SONARQUBE_HOST%/}"
+          REPORT_TASK="src/.sonarqube/out/.sonar/report-task.txt"
+          
+          # 1. Wait for SonarQube background task to complete
+          if [ -f "$REPORT_TASK" ]; then
+            CE_TASK_URL=$(awk -F= '/ceTaskUrl/ {print $2}' "$REPORT_TASK" | tr -d '\r')
+            echo "Waiting for SonarQube task: $CE_TASK_URL"
+            
+            for i in {1..10}; do
+              TASK_STATUS=$(curl -sS -u "${SONAR_GET}:" "$CE_TASK_URL" | jq -r '.task.status')
+              echo "Task status: $TASK_STATUS"
+              if [ "$TASK_STATUS" = "SUCCESS" ]; then
+                sleep 5 # Give SonarQube a moment to index the results
+                break
+              fi
+              sleep 10
+            done
+          fi
+
+          # 2. Determine if this is a Pull Request or a Branch
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            QUERY_PARAM="pullRequest=${{ github.event.pull_request.number }}"
+          else
+            QUERY_PARAM="branch=${GITHUB_REF_NAME}"
+          fi
+
+          # 3. Fetch Metrics
+          METRICS="duplicated_lines_density,duplicated_lines,duplicated_blocks,security_hotspots,security_hotspots_reviewed,security_review_rating,vulnerabilities"
+          URL="${SONAR_BASE}/api/measures/component?component=${SONAR_KEY}&metricKeys=${METRICS}&${QUERY_PARAM}"
+          
+          echo "Fetching metrics from: $URL"
+          RESPONSE=$(curl -sS -u "${SONAR_GET}:" "$URL")
+          
+          # Save response for the next step
+          echo "$RESPONSE" > sonar-metrics.json
+          
+          # Debug: Print response to logs (optional, remove once working)
+          echo "Sonar Response: $RESPONSE"
+
+      - name: SAST Summary
+        if: always()
+        shell: bash
+        run: |
+          METRICS_FILE="sonar-metrics.json"
+          
+          get_metric() {
+            if [ -f "$METRICS_FILE" ]; then
+              # This jq filter handles the nested measures array structure
+              val=$(jq -r --arg k "$1" '.component.measures[] | select(.metric==$k) | .value' "$METRICS_FILE" 2>/dev/null)
+              echo "${val:-n/a}"
+            else
+              echo "n/a"
+            fi
+          }
+
+          DUP_DENSITY=$(get_metric duplicated_lines_density)
+          DUP_LINES=$(get_metric duplicated_lines)
+          DUP_BLOCKS=$(get_metric duplicated_blocks)
+          HOTSPOTS=$(get_metric security_hotspots)
+          HOTSPOTS_REVIEWED=$(get_metric security_hotspots_reviewed)
+          HOTSPOT_RATING=$(get_metric security_review_rating)
+          VULNS=$(get_metric vulnerabilities)
+
+          {
+            echo "### SAST (SonarQube) Summary"
+            echo ""
+            echo "| Metric | Value |"
+            echo "| --- | --- |"
+            echo "| **Quality Gate** | \`${{ steps.quality-gate.outcome }}\` |"
+            echo "| **Vulnerabilities** | \`${VULNS}\` |"
+            echo "| **Security Hotspots** | \`${HOTSPOTS}\` |"
+            echo "| **Duplication Density** | \`${DUP_DENSITY} %\` |"
+            echo "| **Duplicated Lines** | \`${DUP_LINES}\` (Blocks: \`${DUP_BLOCKS}\`) |"
+            echo ""
+            echo "Detailed report available at [SonarQube Portal](${SONARQUBE_HOST}/dashboard?id=${SONAR_KEY})"
+          } >> "$GITHUB_STEP_SUMMARY"

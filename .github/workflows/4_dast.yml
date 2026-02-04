@@ -1,0 +1,118 @@
+name: ZAP Active Scan
+
+on:
+  workflow_call:
+    secrets:
+      ZAP_API_KEY:
+        required: true
+      ZAP_DASHBOARD_TOKEN:
+        required: true
+
+jobs:
+  zap_scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      ZAP_API: "https://zapscan.seliselocal.com"
+      ZAP_KEY: ${{ secrets.ZAP_API_KEY }}
+      TARGET: "https://dev-api.seliseblocks.com"
+      REPORT_FILE: "zap-report.xml"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Access target URL
+        run: |
+          echo "Accessing target URL to populate ZAP session..."
+          curl "$ZAP_API/JSON/core/action/accessUrl/?apikey=$ZAP_KEY&url=$TARGET&followRedirects=" > /dev/null
+          curl "$ZAP_API/JSON/core/view/sites/?apikey=$ZAP_KEY"
+ 
+      - name: Start Scan
+        id: start-scan
+        run: |
+          echo "Starting active scan..."
+          SCAN_ID=$(curl -s "$ZAP_API/JSON/ascan/action/scan/?url=$TARGET&recurse=true&inScopeOnly=false&apikey=$ZAP_KEY" | jq -r '.scan')
+          # curl -s "$ZAP_API/JSON/ascan/action/scan/?url=$TARGET&recurse=true&inScopeOnly=false&apikey=$ZAP_KEY"
+
+          echo "Scan ID: $SCAN_ID"
+          echo "SCAN_ID=$SCAN_ID" >> $GITHUB_ENV
+
+      - name: Wait until scan is finished
+        run: |
+          echo "Waiting for scan to reach 100%..."
+          while true; do
+            STATUS=$(curl -s "$ZAP_API/JSON/ascan/view/status/?scanId=${SCAN_ID}&apikey=$ZAP_KEY" | jq -r '.status')
+            echo "Scan progress: $STATUS%"
+
+            if [ "$STATUS" = "100" ]; then
+              echo "Scan Completed!"
+              break
+            fi
+            sleep 15
+          done
+
+      - name: Download xml Report
+        run: |
+          echo "Downloading Report..."
+          curl -s "$ZAP_API/OTHER/core/other/xmlreport/?apikey=$ZAP_KEY" -o "$REPORT_FILE"
+
+      - name: Compute ZAP severity counts
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$REPORT_FILE" ]; then
+            echo "Report found, computing severities..."
+            python .github/scripts/compute_zap_severity.py "$REPORT_FILE"
+            cat zap-severity.env >> "$GITHUB_ENV"
+            if [ -f "zap-severity.env" ]; then
+              cat zap-severity.env >> "$GITHUB_ENV"
+              echo "Severity counts added to GITHUB_ENV"
+            else
+              echo "Error: zap-severity.env was not created"
+            fi
+          else
+            echo "Error: $REPORT_FILE not found in $(pwd)"
+          fi
+
+      - name: Upload Report Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: ${{ env.REPORT_FILE }}
+
+      # - name: Upload Report to DefectDojo
+      #   run: |
+      #     curl -X POST "https://zap-dashboard.seliselocal.com/api/v2/import-scan/" \
+      #     -H "Authorization: Token ${{ secrets.ZAP_DASHBOARD_TOKEN }}" \
+      #     -H "Content-Type: multipart/form-data" \
+      #     -F "active=true" \
+      #     -F "verified=true" \
+      #     -F "scan_type=ZAP Scan" \
+      #     -F "product_name=ZAP-int-Test" \
+      #     -F "engagement_name=CI/CD Engagement" \
+      #     -F "auto_create_context=true" \
+      #     -F "file=@$REPORT_FILE"
+
+      - name: DAST Summary
+        if: always()
+        shell: bash
+        run: |
+          ZAP_HIGH="${ZAP_HIGH:-n/a}"
+          ZAP_MEDIUM="${ZAP_MEDIUM:-n/a}"
+          ZAP_LOW="${ZAP_LOW:-n/a}"
+          ZAP_INFO="${ZAP_INFO:-n/a}"
+          ZAP_TOTAL="${ZAP_TOTAL:-n/a}"
+          {
+            echo "### DAST (ZAP) Summary"
+            echo ""
+            echo "- Target: \`${TARGET}\`"
+            echo "- ZAP API: \`${ZAP_API}\`"
+            echo "- Scan ID: \`${SCAN_ID:-unknown}\`"
+            echo "- Report: \`$REPORT_FILE\`"
+            echo "- Artifact: \`zap-report\`"
+            echo "- Findings: high \`${ZAP_HIGH}\`, medium \`${ZAP_MEDIUM}\`, low \`${ZAP_LOW}\`, info \`${ZAP_INFO}\` (total \`${ZAP_TOTAL}\`)"
+            echo "- DefectDojo import: attempted"
+          } >> "$GITHUB_STEP_SUMMARY"
