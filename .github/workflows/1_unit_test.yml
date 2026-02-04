@@ -1,0 +1,58 @@
+name: Run Tests
+on:
+  workflow_call:
+    inputs:
+      COMMENT_RESULTS:
+        description: "Whether to post PR comments with test results"
+        required: false
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  checks: write
+jobs:
+  build:
+    name: Test Execution
+    runs-on: ubuntu-latest
+
+    steps:
+      
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0  
+
+      - name: Set Environment Variables
+        uses: ./.github/actions/setvars
+        with:
+          varFilePath: ./.github/variables/vars.env
+      
+      - name: Run Tests
+        working-directory: ./src
+        shell: pwsh
+        run: |
+          dotnet restore "./${{ env.SOLUTION_NAME }}" -s https://api.nuget.org/v3/index.json -s https://nuget.selise.biz/nuget
+          dotnet build "./${{ env.SOLUTION_NAME }}" --no-incremental
+          dotnet test XUnitTest/XUnitTest.csproj `
+            --no-build `
+            --collect:"XPlat Code Coverage" `
+            --logger:"junit;LogFilePath=test-results/xunit_results.xml"
+
+      - name: Install ReportGenerator
+        shell: pwsh
+        run: dotnet tool install --tool-path ./tools dotnet-reportgenerator-globaltool
+
+      - name: Show Coverage Summary
+        shell: pwsh
+        run: |
+          $cov = Get-ChildItem -Recurse ./src/XUnitTest/TestResults -Filter coverage.cobertura.xml | Select-Object -First 1
+          if (-not $cov) { Write-Error "No coverage.cobertura.xml found"; exit 1 }
+          ./tools/reportgenerator -reports:$cov.FullName -targetdir:coverage-report -reporttypes:"TextSummary"
+          Get-Content coverage-report/Summary.txt
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@4a2f0813705cbec5ca60db5218954b492bd80168 # v1
+        id: test-results
+        if: always()
+        with:
+          files: "./src/XUnitTest/test-results/*.xml"
+          comment_mode: ${{ inputs.COMMENT_RESULTS && 'always' || 'off' }}
