@@ -164,7 +164,7 @@ jobs:
           if ! timeout 120s cosign verify \
             --offline \
             --output json \
-            --certificate-identity-regexp "https://github.com/${{ github.repository }}/.github/workflows/.*" \
+            --certificate-identity-regexp "https://github.com/SELISEdigitalplatforms/blocks-inventory/.github/workflows/.*" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "${image_digest_ref}" > "${VERIFY_LOG}" 2>&1; then
             echo "cosign verify failed; output below" >&2
