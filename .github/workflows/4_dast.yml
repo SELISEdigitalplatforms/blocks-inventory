@@ -70,7 +70,24 @@ jobs:
         run: |
           if [ -f "$REPORT_FILE" ]; then
             echo "Report found, computing severities..."
-            python .github/scripts/compute_zap_severity.py "$REPORT_FILE"
+            if [ ! -f "$REPORT_FILE" ]; then
+              echo "error: report not found: $REPORT_FILE" >&2
+              exit 2
+            fi
+
+            ZAP_HIGH=$(grep -o "<riskcode>3</riskcode>" "$REPORT_FILE" | wc -l | xargs)
+            ZAP_MEDIUM=$(grep -o "<riskcode>2</riskcode>" "$REPORT_FILE" | wc -l | xargs)
+            ZAP_LOW=$(grep -o "<riskcode>1</riskcode>" "$REPORT_FILE" | wc -l | xargs)
+            ZAP_INFO=$(grep -o "<riskcode>0</riskcode>" "$REPORT_FILE" | wc -l | xargs)
+            ZAP_TOTAL=$((ZAP_HIGH + ZAP_MEDIUM + ZAP_LOW + ZAP_INFO))
+
+            {
+              echo "ZAP_HIGH=${ZAP_HIGH}"
+              echo "ZAP_MEDIUM=${ZAP_MEDIUM}"
+              echo "ZAP_LOW=${ZAP_LOW}"
+              echo "ZAP_INFO=${ZAP_INFO}"
+              echo "ZAP_TOTAL=${ZAP_TOTAL}"
+            } > zap-severity.env
             cat zap-severity.env >> "$GITHUB_ENV"
             if [ -f "zap-severity.env" ]; then
               cat zap-severity.env >> "$GITHUB_ENV"
