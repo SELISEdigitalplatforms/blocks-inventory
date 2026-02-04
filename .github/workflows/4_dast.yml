@@ -24,6 +24,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Create new session
+        run: |
+          echo "Creating new ZAP session..."
+          curl "$ZAP_API/JSON/core/action/newSession/?apikey=$ZAP_KEY&name=dev-api&overwrite=true" > /dev/null
+          
       - name: Access target URL
         run: |
           echo "Accessing target URL to populate ZAP session..."
@@ -82,19 +87,6 @@ jobs:
         with:
           name: zap-report
           path: ${{ env.REPORT_FILE }}
-
-      # - name: Upload Report to DefectDojo
-      #   run: |
-      #     curl -X POST "https://zap-dashboard.seliselocal.com/api/v2/import-scan/" \
-      #     -H "Authorization: Token ${{ secrets.ZAP_DASHBOARD_TOKEN }}" \
-      #     -H "Content-Type: multipart/form-data" \
-      #     -F "active=true" \
-      #     -F "verified=true" \
-      #     -F "scan_type=ZAP Scan" \
-      #     -F "product_name=ZAP-int-Test" \
-      #     -F "engagement_name=CI/CD Engagement" \
-      #     -F "auto_create_context=true" \
-      #     -F "file=@$REPORT_FILE"
 
       - name: DAST Summary
         if: always()
