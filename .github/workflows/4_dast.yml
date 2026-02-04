@@ -5,14 +5,10 @@ on:
     secrets:
       ZAP_API_KEY:
         required: true
-      ZAP_DASHBOARD_TOKEN:
-        required: true
 
 jobs:
   zap_scan:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     env:
       ZAP_API: "https://zapscan.seliselocal.com"
@@ -21,9 +17,6 @@ jobs:
       REPORT_FILE: "zap-report.xml"
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Create new session
         run: |
           echo "Creating new ZAP session..."
@@ -64,26 +57,12 @@ jobs:
           echo "Downloading Report..."
           curl -s "$ZAP_API/OTHER/core/other/xmlreport/?apikey=$ZAP_KEY" -o "$REPORT_FILE"
 
-      - name: Checkout script from external repo
-        uses: actions/checkout@v4
-        with:
-          repository: SELISEdigitalplatforms/blocks-inventory 
-          ref: main                         # Replace with branch/tag
-          path: .github/scripts/           # Download into this folder
-          sparse-checkout: |
-            .github/scripts/compute_zap_severity.py
-          sparse-checkout-cone-mode: false
-
       - name: Compute ZAP severity counts
         if: always()
         shell: bash
         run: |
           if [ -f "$REPORT_FILE" ]; then
             echo "Report found, computing severities..."
-            if [ ! -f "$REPORT_FILE" ]; then
-              echo "error: report not found: $REPORT_FILE" >&2
-              exit 2
-            fi
 
             ZAP_HIGH=$(grep -o "<riskcode>3</riskcode>" "$REPORT_FILE" | wc -l | xargs)
             ZAP_MEDIUM=$(grep -o "<riskcode>2</riskcode>" "$REPORT_FILE" | wc -l | xargs)
@@ -133,5 +112,4 @@ jobs:
             echo "- Report: \`$REPORT_FILE\`"
             echo "- Artifact: \`zap-report\`"
             echo "- Findings: high \`${ZAP_HIGH}\`, medium \`${ZAP_MEDIUM}\`, low \`${ZAP_LOW}\`, info \`${ZAP_INFO}\` (total \`${ZAP_TOTAL}\`)"
-            echo "- DefectDojo import: attempted"
           } >> "$GITHUB_STEP_SUMMARY"
