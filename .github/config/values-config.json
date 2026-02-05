@@ -32,5 +32,39 @@
         }
       }
     ]
+  },
+  "blocks-idp-net": {
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-idp-net-worker.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-idp-net-v1-api.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
   }
 }
