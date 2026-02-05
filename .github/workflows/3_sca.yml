@@ -26,15 +26,15 @@ jobs:
 
       - name: Restore Dependencies
         working-directory: ./src
-        run: | 
+        run: |
           # dotnet restore "./${{ env.SOLUTION_NAME }}" -s https://api.nuget.org/v3/index.json -s https://nuget.selise.biz/nuget
           dotnet restore "./${{ env.SOLUTION_NAME }}" --configfile ../config/NuGetPackageSource.Config
 
       - name: Generate CycloneDX SBOM (JSON) for .NET
         uses: CycloneDX/gh-dotnet-generate-sbom@697f83d4a29dcc3fb5d78ecb1843d1ee4532a390 # v1
         with:
-          path: ./src/${{ env.SOLUTION_NAME }}                     
-          json: true                             
+          path: ./src/${{ env.SOLUTION_NAME }}
+          json: true
 
       - name: Upload SBOM as a workflow artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -47,12 +47,12 @@ jobs:
       - name: Upload SBOM to Dependency-Track (action)
         uses: DependencyTrack/gh-upload-sbom@48feab3080ff9e8f51f4d21861d9fc914eb744f5 # v3.1.0
         with:
-          serverHostname: 'api-dt.seliseblocks.com'
-          apiKey: ${{ secrets.DEPENDENCY_TRACK_API_KEY }}
-          projectName: ${{ github.event.repository.name }}
-          projectVersion: ${{ github.ref_name }}
-          bomFilename: bom.json
-          autoCreate: true
+          serverhostname: "api-dt.seliseblocks.com"
+          apikey: ${{ secrets.DEPENDENCY_TRACK_API_KEY }}
+          projectname: ${{ github.event.repository.name }}
+          projectversion: ${{ github.ref_name }}
+          bomfilename: bom.json
+          autocreate: true
 
       # - name: Fetch Dependency-Track findings summary
       #   if: always()
@@ -110,7 +110,7 @@ jobs:
           # Get Project UUID
           PROJECT_JSON=$(curl -sS -H "X-Api-Key: ${DTRACK_API_KEY}" \
             "${DTRACK_BASE}/api/v1/project/lookup?name=${PROJECT_NAME}&version=${PROJECT_VERSION}")
-          
+
           PROJECT_UUID=$(echo "$PROJECT_JSON" | jq -r '.uuid // empty')
 
           if [ -z "$PROJECT_UUID" ]; then
@@ -196,7 +196,7 @@ jobs:
         run: |
           # Initialize variables with 0 or N/A
           CRITICAL="0"; HIGH="0"; MEDIUM="0"; LOW="0"; UNASSIGNED="0"; TOTAL="0"
-          
+
           if [ "$METRICS_FOUND" == "true" ] && [ -f "dtrack-metrics.json" ]; then
             # Using 'or 0' in jq to ensure we never get an empty string
             CRITICAL=$(jq -r '.critical // 0' dtrack-metrics.json)
