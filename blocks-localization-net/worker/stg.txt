@@ -1,1 +1,2 @@
-blocksos/blocks-localization-net-worker:02f911a-114-26.02.31blocksos/blocks-localization-net-worker:543c512-117-26.02.39
+blocksos/blocks-localization-net-worker:02f911a-114-26.02.31
+blocksos/blocks-localization-net-worker:543c512-117-26.02.39
