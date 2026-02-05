@@ -31,7 +31,7 @@ jobs:
           dotnet restore "./${{ env.SOLUTION_NAME }}" --configfile ../config/NuGetPackageSource.Config
 
       - name: Generate CycloneDX SBOM (JSON) for .NET
-        uses: CycloneDX/gh-dotnet-generate-sbom@697f83d4a29dcc3fb5d78ecb1843d1ee4532a390 # v1
+        uses: CycloneDX/gh-dotnet-generate-sbom@c183e4ac30e5b99354cb9a98c38548e07c538346 # v1.0.1
         with:
           path: ./src/${{ env.SOLUTION_NAME }}
           json: true
