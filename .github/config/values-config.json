@@ -66,5 +66,157 @@
         }
       }
     ]
+  },
+  "blocks-identifier-net": {
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-identifier-net-worker.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-identifier-net-v1-api.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
+  },
+  "blocks-lmt-net": {
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-lmt-net-worker.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-lmt-net-v1-api.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
+  },
+  "blocks-communication-net": {
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-communication-net-worker.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-communication-net-v1-api.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "mailbox": [
+      {
+        "version": "",
+        "file": "blocks-communication-net-v1-mailbox.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
+  },
+  "blocks-uds-net": {
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-uds-net-worker.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-uds-net-v1-api.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
   }
 }
