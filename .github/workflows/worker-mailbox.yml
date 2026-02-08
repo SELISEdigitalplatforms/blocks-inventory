@@ -1,0 +1,313 @@
+name: CI (worker)
+
+on:
+  workflow_call:
+    inputs:
+      MODE:
+        description: "dev or main"
+        required: true
+        type: string
+      PR_NUMBER:
+        description: "PR number for main flow"
+        required: false
+        type: string
+    outputs:
+      image_tag:
+        description: "The image tag produced by the build"
+        value: ${{ jobs.build-tag.outputs.image_tag }}
+      image_name:
+        description: "The full image name (repository) produced by the build"
+        value: ${{ jobs.build-tag.outputs.image_name }}
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+      BLOCKSOS_REPO:
+        required: true
+      SELISE_GITHUB_PAT:
+        required: true
+permissions:
+  contents: read
+
+env:
+  SERVICE_TYPE: worker-mailbox
+
+jobs:
+  build-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.set-image-tag.outputs.image_tag }}
+      image_name: ${{ steps.set-image-tag.outputs.image_name }}
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set Environment Variables
+        uses: ./.github/actions/setvars
+        with:
+          varFilePath: ./.github/variables/vars.env
+
+      - name: Fetch tags
+        run: git fetch --tags --force
+
+      - name: Determine next version
+        id: determine-version
+        run: |
+          DATE_PREFIX="$(date +'%y.%m')"
+          LAST_RELEASE=$(git tag | grep -E "^${DATE_PREFIX}\\.[0-9]+$" | sort -V | tail -1)
+          if [[ -z "$LAST_RELEASE" ]]; then
+            RELEASE=1
+          else
+            RELEASE="${LAST_RELEASE##*.}"
+            RELEASE=$((RELEASE + 1))
+          fi
+
+          NEW_VERSION="${DATE_PREFIX}.${RELEASE}"
+          echo "semantic_version=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Set image tag
+        id: set-image-tag
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          if [ "${{ inputs.MODE }}" = "main" ]; then
+            IMAGE_TAG="${SHORT_SHA}-${{ inputs.PR_NUMBER }}-${semantic_version}"
+            IMAGE_NAME="${{ secrets.BLOCKSOS_REPO }}/${SERVICE_NAME}-${SERVICE_TYPE}"
+          else
+            IMAGE_TAG="${SHORT_SHA}-${semantic_version}"
+            IMAGE_NAME="${{ secrets.BLOCKSOS_REPO }}/dev-${SERVICE_NAME}-${SERVICE_TYPE}"
+          fi
+
+          echo "image_name=${IMAGE_NAME}" >> $GITHUB_ENV
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_ENV
+          echo "image_name=${IMAGE_NAME}" >> $GITHUB_OUTPUT
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        run: |
+          docker build -t "${image_name}:${image_tag}" --file "${WORKER_DOCKERFILE}" --build-arg build_version="${semantic_version}" .
+          docker push "${image_name}:${image_tag}"
+
+      - name: Resolve image digest
+        run: |
+          IMAGE_REF="${image_name}:${image_tag}"
+          IMAGE_DIGEST_REF=$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REF}")
+          if [ -z "${IMAGE_DIGEST_REF}" ]; then
+            docker pull "${IMAGE_REF}"
+            IMAGE_DIGEST_REF=$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REF}")
+          fi
+
+          if [ -z "${IMAGE_DIGEST_REF}" ]; then
+            echo "Failed to resolve image digest for ${IMAGE_REF}" >&2
+            exit 1
+          fi
+
+          echo "image_digest_ref=${IMAGE_DIGEST_REF}" >> $GITHUB_ENV
+
+      - name: Generate SBOM (syft, fallback to trivy)
+        run: |
+          SBOM_FILE="sbom-worker-mailbox.json"
+          SYFT_OK=0
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD:/work" \
+            -w /work \
+            anchore/syft:latest "${image_digest_ref}" -o cyclonedx-json > "${SBOM_FILE}" || SYFT_OK=$?
+
+          if [ "${SYFT_OK}" -ne 0 ]; then
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD:/work" \
+              -w /work \
+              aquasec/trivy:latest sbom --format cyclonedx --output "${SBOM_FILE}" "${image_digest_ref}"
+          fi
+
+          if [ ! -s "${SBOM_FILE}" ]; then
+            echo "SBOM generation failed for ${image_digest_ref}" >&2
+            exit 1
+          fi
+
+          echo "sbom_file=${SBOM_FILE}" >> $GITHUB_ENV
+
+      - name: Install cosign
+        id: install-cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image by digest
+        id: sign-image
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        run: |
+          cosign sign --yes "${image_digest_ref}"
+
+      - name: Attach SBOM attestation
+        id: attest-sbom
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        run: |
+          cosign attest --yes --type cyclonedx --predicate "${sbom_file}" "${image_digest_ref}"
+
+      - name: Verify signature
+        id: verify-signature
+        run: |
+          VERIFY_LOG="$(mktemp)"
+          if ! timeout 120s cosign verify \
+            --offline \
+            --output json \
+            --certificate-identity-regexp "https://github.com/SELISEdigitalplatforms/blocks-inventory/.github/workflows/.*" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "${image_digest_ref}" > "${VERIFY_LOG}" 2>&1; then
+            echo "cosign verify failed; output below" >&2
+            cat "${VERIFY_LOG}" >&2
+            exit 1
+          fi
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom-worker-mailbox
+          path: ${{ env.sbom_file }}
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Image Security Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Image Security Summary (Worker)"
+            echo ""
+            echo "- Image: \`${image_name}:${image_tag}\`"
+            echo "- Digest: \`${image_digest_ref}\`"
+            echo "- SBOM: \`${sbom_file}\`"
+            echo "- SBOM artifact: \`sbom-worker\`"
+            echo "- Cosign sign: \`${{ steps.sign-image.outcome }}\`"
+            echo "- Cosign attest: \`${{ steps.attest-sbom.outcome }}\`"
+            echo "- Verify signature: \`${{ steps.verify-signature.outcome }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create and push tag
+        run: |
+          git config --local user.name "devops-selise"
+          git config --local user.email "devops@selisegroup.com"
+          if git show-ref --tags --verify --quiet "refs/tags/${semantic_version}"; then
+            echo "Tag ${semantic_version} already exists; skipping."
+            exit 0
+          fi
+          if git ls-remote --tags origin "refs/tags/${semantic_version}" | grep -q .; then
+            echo "Remote tag ${semantic_version} already exists; skipping."
+            exit 0
+          fi
+
+          git tag "${semantic_version}"
+          if ! git push origin "${semantic_version}"; then
+            if git ls-remote --tags origin "refs/tags/${semantic_version}" | grep -q .; then
+              echo "Remote tag ${semantic_version} appeared during push; skipping."
+              exit 0
+            fi
+            echo "Failed to push tag ${semantic_version}" >&2
+            exit 1
+          fi
+
+      - name: Checkout inventory repo
+        if: ${{ inputs.MODE == 'main' }}
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: SELISEdigitalplatforms/blocks-inventory
+          token: ${{ secrets.SELISE_GITHUB_PAT }}
+          path: blocks-inventory
+
+      - name: Update inventory and open PR
+        if: ${{ inputs.MODE == 'main' }}
+        env:
+          GH_TOKEN: ${{ secrets.SELISE_GITHUB_PAT }}
+        run: |
+          cd blocks-inventory
+          IMAGE_REF="${image_name}:${image_tag}"
+          PR_NUM="${{ inputs.PR_NUMBER }}"
+
+          TARGET_ENVS="stg prod"
+
+          for TARGET_ENV in ${TARGET_ENVS}; do
+            # Reduce push collisions when multiple workflows update inventory
+            echo "Sleeping 15s to reduce push conflicts..."
+            sleep 15
+
+            git checkout main
+            git pull --rebase origin main
+
+            TARGET_FILE="${SERVICE_NAME}/${SERVICE_TYPE}/${TARGET_ENV}.txt"
+            mkdir -p "${SERVICE_NAME}/${SERVICE_TYPE}"
+            echo "${IMAGE_REF}" >> "${TARGET_FILE}"
+
+            git config --local user.name "devops-selise"
+            git config --local user.email "devops@selisegroup.com"
+
+            if [ "${TARGET_ENV}" = "stg" ]; then
+              git add "${TARGET_FILE}"
+              git commit -m "Update ${SERVICE_NAME}-${SERVICE_TYPE} ${TARGET_ENV} to ${semantic_version}" || true
+
+              MAX_RETRIES=5
+              RETRY=0
+              BASE_DELAY=3
+              while [ $RETRY -lt $MAX_RETRIES ]; do
+                if git pull --rebase origin main && git push origin main; then
+                  break
+                fi
+                RETRY=$((RETRY + 1))
+                if [ $RETRY -lt $MAX_RETRIES ]; then
+                  WAIT=$((BASE_DELAY * RETRY + RANDOM % 3))
+                  echo "Push failed, retrying in ${WAIT}s..."
+                  sleep $WAIT
+                else
+                  echo "Failed to push after $MAX_RETRIES attempts" >&2
+                  exit 1
+                fi
+              done
+            else
+              if [ -z "${PR_NUM}" ]; then
+                echo "PR_NUMBER is required for prod updates; skipping." >&2
+                exit 1
+              fi
+
+              BRANCH_NAME="${SERVICE_NAME}-${SERVICE_TYPE}-${PR_NUM}-${TARGET_ENV}"
+              git checkout -B "${BRANCH_NAME}" main
+              git add "${TARGET_FILE}"
+              git commit -m "Update ${SERVICE_NAME}-${SERVICE_TYPE} ${TARGET_ENV} to ${semantic_version}" || true
+
+              MAX_RETRIES=5 
+              RETRY=0
+              BASE_DELAY=3
+              while [ $RETRY -lt $MAX_RETRIES ]; do
+                git pull --rebase origin "${BRANCH_NAME}" || true
+                if git push origin "${BRANCH_NAME}"; then
+                  break
+                fi
+                RETRY=$((RETRY + 1))
+                if [ $RETRY -lt $MAX_RETRIES ]; then
+                  WAIT=$((BASE_DELAY * RETRY + RANDOM % 3))
+                  echo "Push failed, retrying in ${WAIT}s..."
+                  sleep $WAIT
+                else
+                  echo "Failed to push after $MAX_RETRIES attempts" >&2
+                  exit 1
+                fi
+              done
+
+              curl -s -o /tmp/pr.json -w "%{http_code}" \
+                -H "Authorization: Bearer ${GH_TOKEN}" \
+                -H "Accept: application/vnd.github+json" \
+                -X POST "https://api.github.com/repos/SELISEdigitalplatforms/blocks-inventory/pulls" \
+                -d "{\"title\":\"${SERVICE_NAME}-${SERVICE_TYPE} ${semantic_version} (${TARGET_ENV})\",\"body\":\"Auto-created from ${BRANCH_NAME}\",\"head\":\"${BRANCH_NAME}\",\"base\":\"main\"}"
+            fi
+          done
