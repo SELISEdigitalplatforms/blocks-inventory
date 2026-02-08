@@ -65,7 +65,7 @@ jobs:
           dotnet-sonarscanner begin /k:"${{ env.SONAR_KEY }}" /o:"${{ env.AUTHOR }}" /d:sonar.login=${{ secrets.SONAR_TOKEN }} /d:sonar.host.url="${{ env.SONARQUBE_HOST }}" /d:sonar.cs.opencover.reportsPaths=coverage.xml
           dotnet restore "./${{ env.SOLUTION_NAME }}" -s https://api.nuget.org/v3/index.json -s https://nuget.selise.biz/nuget
           dotnet build "./${{ env.SOLUTION_NAME }}" --no-incremental
-          coverlet ./XUnitTests/bin/Debug/net9.0/XUnitTests.dll --target "dotnet" --targetargs "test ./${{ env.SOLUTION_NAME }} --no-build" -f=opencover -o="coverage.xml"
+          coverlet ./XUnitTest/bin/Debug/net9.0/XUnitTest.dll --target "dotnet" --targetargs "test ./${{ env.SOLUTION_NAME }} --no-build" -f=opencover -o="coverage.xml"
           dotnet-sonarscanner end /d:sonar.login=${{ secrets.SONAR_TOKEN }}
 
       - name: SonarQube Quality Gate check
