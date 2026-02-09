@@ -1,0 +1,482 @@
+name: Reusable - SCA Scan .NET
+
+on:
+  workflow_call:
+    inputs:
+      # ========================================
+      # General Configuration
+      # ========================================
+      PROJECT_NAME:
+        description: "Project name for Dependency-Track (defaults to repository name)"
+        required: false
+        type: string
+        default: ""
+
+      PROJECT_VERSION:
+        description: "Project version for Dependency-Track (defaults to branch/tag name)"
+        required: false
+        type: string
+        default: ""
+
+      DOTNET_VERSION:
+        description: ".NET SDK version to use (e.g., '6.0.x', '8.0.x', '9.0.x')"
+        required: false
+        type: string
+        default: "9.0.x"
+
+      # ========================================
+      # Solution Configuration
+      # ========================================
+      WORKING_DIRECTORY:
+        description: "Working directory containing the solution (e.g., './src')"
+        required: false
+        type: string
+        default: "./src"
+
+      SOLUTION_NAME:
+        description: "Solution file name (e.g., 'YourSolution.sln'). If empty, auto-detects first .sln file"
+        required: false
+        type: string
+        default: ""
+
+      # ========================================
+      # NuGet Configuration
+      # ========================================
+      NUGET_SOURCES:
+        description: "Space-separated list of NuGet sources (used only if no nuget.config exists in repo and NUGET_CONFIG_CONTENT is not provided)"
+        required: false
+        type: string
+        default: "https://api.nuget.org/v3/index.json https://nuget.selise.biz/nuget"
+
+      NUGET_CONFIG_CONTENT:
+        description: "Custom NuGet configuration XML content (optional). Priority: 1) Existing repo nuget.config, 2) This parameter, 3) NUGET_SOURCES. Use this for advanced configuration like allowInsecureConnections."
+        required: false
+        type: string
+        default: ""
+
+      SKIP_RESTORE:
+        description: "Skip dotnet restore (useful if dependencies are already restored)"
+        required: false
+        type: boolean
+        default: false
+
+      # ========================================
+      # SBOM Tool Configuration
+      # ========================================
+      SBOM_TOOL:
+        description: "SBOM generation tool (cdxgen, cyclonedx-dotnet)"
+        required: false
+        type: string
+        default: "cdxgen"
+
+      USE_DOCKER:
+        description: "Use Docker version of cdxgen (recommended for .NET)"
+        required: false
+        type: boolean
+        default: false
+
+      DOCKER_DOTNET_VERSION:
+        description: "Docker image .NET version (dotnet6, dotnet7, dotnet8, dotnet9) - only used if USE_DOCKER is true"
+        required: false
+        type: string
+        default: "dotnet9"
+
+      CDXGEN_VERSION:
+        description: "cdxgen version for native installation (auto-detected if empty)"
+        required: false
+        type: string
+        default: ""
+
+      CYCLONEDX_DOTNET_VERSION:
+        description: "CycloneDX .NET tool version (auto-detected if empty)"
+        required: false
+        type: string
+        default: ""
+
+      INCLUDE_FORMULATION:
+        description: "Include build/CI info in SBOM (cdxgen only)"
+        required: false
+        type: boolean
+        default: true
+
+      # ========================================
+      # Dependency-Track Configuration
+      # ========================================
+      DEPENDENCY_TRACK_HOST:
+        description: "Dependency-Track API server hostname (backend)"
+        required: false
+        type: string
+        default: "api-dt.seliseblocks.com"
+
+      DEPENDENCY_TRACK_FRONTEND_URL:
+        description: "Dependency-Track frontend URL (for dashboard links)"
+        required: false
+        type: string
+        default: "sca.seliseblocks.com"
+
+      SBOM_FILENAME:
+        description: "SBOM filename to generate (JSON format only)"
+        required: false
+        type: string
+        default: "bom.json"
+
+      AUTO_CREATE_PROJECT:
+        description: "Auto-create project in Dependency-Track if it doesn't exist"
+        required: false
+        type: boolean
+        default: true
+
+      ARTIFACT_RETENTION_DAYS:
+        description: "Number of days to retain SBOM artifact"
+        required: false
+        type: number
+        default: 2
+
+      # ========================================
+      # Optional Features
+      # ========================================
+      HAS_SUBMODULES:
+        description: "Set to true if repository uses Git submodules"
+        required: false
+        type: boolean
+        default: false
+
+      # LOAD_CUSTOM_VARS:
+      #   description: "Load variables from .github/actions/setvars"
+      #   required: false
+      #   type: boolean
+      #   default: false
+
+    secrets:
+      DEPENDENCY_TRACK_API_KEY:
+        required: true
+        description: "Dependency-Track API key"
+
+      SELISE_GITHUB_PAT:
+        required: false
+        description: "GitHub PAT for private repositories and submodules"
+
+jobs:
+  sca-scan:
+    name: SCA Scan & SBOM Upload
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: ${{ inputs.HAS_SUBMODULES && 'recursive' || 'false' }}
+          token: ${{ secrets.SELISE_GITHUB_PAT || github.token }}
+
+      - name: Update submodules
+        if: inputs.HAS_SUBMODULES
+        run: |
+          git submodule update --init --recursive
+          echo "✅ Submodules updated" >> $GITHUB_STEP_SUMMARY
+
+      # - name: Load Custom Variables
+      #   if: inputs.LOAD_CUSTOM_VARS
+      #   uses: ./.github/actions/setvars
+      #   with:
+      #     varFilePath: ./.github/variables/vars.env
+
+      - name: Set up Docker Buildx
+        if: inputs.SBOM_TOOL == 'cdxgen' && inputs.USE_DOCKER
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        if: inputs.SBOM_TOOL == 'cdxgen' && inputs.USE_DOCKER
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-cdxgen-dotnet-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-cdxgen-dotnet-
+
+      - name: Pull cdxgen Docker image
+        if: inputs.SBOM_TOOL == 'cdxgen' && inputs.USE_DOCKER
+        run: |
+          echo "📥 Pulling cdxgen Docker image for ${{ inputs.DOCKER_DOTNET_VERSION }}..."
+          docker pull ghcr.io/cyclonedx/cdxgen-debian-${{ inputs.DOCKER_DOTNET_VERSION }}:latest
+          echo "✅ Docker image cached" >> $GITHUB_STEP_SUMMARY
+
+      - name: Setup .NET SDK
+        if: ${{ !inputs.USE_DOCKER }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.DOTNET_VERSION }}
+
+      - name: Setup Node.js (for native cdxgen)
+        if: inputs.SBOM_TOOL == 'cdxgen' && !inputs.USE_DOCKER
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Determine project configuration
+        id: config
+        run: |
+          # Determine project name
+          if [ -n "${{ inputs.PROJECT_NAME }}" ]; then
+            PROJECT_NAME="${{ inputs.PROJECT_NAME }}"
+          else
+            PROJECT_NAME="${{ github.event.repository.name }}"
+          fi
+          echo "project_name=$PROJECT_NAME" >> $GITHUB_OUTPUT
+
+          # Determine project version
+          if [ -n "${{ inputs.PROJECT_VERSION }}" ]; then
+            PROJECT_VERSION="${{ inputs.PROJECT_VERSION }}"
+          else
+            PROJECT_VERSION="${{ github.ref_name }}"
+          fi
+          echo "project_version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
+
+          # Determine solution name
+          if [ -n "${{ inputs.SOLUTION_NAME }}" ]; then
+            SOLUTION_NAME="${{ inputs.SOLUTION_NAME }}"
+          elif [ -n "${SOLUTION_NAME}" ]; then
+            # Loaded from setvars
+            SOLUTION_NAME="${SOLUTION_NAME}"
+          else
+            # Auto-detect first .sln file
+            SOLUTION_FILE=$(find ${{ inputs.WORKING_DIRECTORY }} -maxdepth 1 -name "*.sln" | head -n 1)
+            if [ -n "$SOLUTION_FILE" ]; then
+              SOLUTION_NAME=$(basename "$SOLUTION_FILE")
+            else
+              echo "❌ No solution file found in ${{ inputs.WORKING_DIRECTORY }}" >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          fi
+          echo "solution_name=$SOLUTION_NAME" >> $GITHUB_OUTPUT
+
+          # Summary
+          echo "### 🔍 SCA Scan Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project**: \`$PROJECT_NAME\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: \`$PROJECT_VERSION\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Solution**: \`$SOLUTION_NAME\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Working Directory**: ${{ inputs.WORKING_DIRECTORY }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SBOM Tool**: ${{ inputs.SBOM_TOOL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **.NET Version**: ${{ inputs.DOTNET_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Use Docker**: ${{ inputs.USE_DOCKER }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.USE_DOCKER }}" = "true" ]; then
+            echo "- **Docker Image**: ${{ inputs.DOCKER_DOTNET_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Restore NuGet packages
+        if: ${{ !inputs.SKIP_RESTORE }}
+        working-directory: ${{ inputs.WORKING_DIRECTORY }}
+        run: |
+          echo "📦 Restoring NuGet packages for ${{ steps.config.outputs.solution_name }}..."
+
+          # NuGet Configuration Priority:
+          # 1. config/*.config folder (validated as NuGet config)
+          # 2. Existing nuget.config in repo (use as-is)
+          # 3. NUGET_CONFIG_CONTENT input (create custom config)
+          # 4. NUGET_SOURCES input (use -s arguments)
+
+          # Check for config folder with any .config/.Config file first (at repo root)
+          # Validate it's a legitimate NuGet config (contains <packageSources>)
+          CONFIG_FOLDER_FILE=""
+          for cfg_file in "$GITHUB_WORKSPACE"/config/*.config "$GITHUB_WORKSPACE"/config/*.Config; do
+            if [ -f "$cfg_file" ]; then
+              if grep -q "<packageSources>" "$cfg_file" 2>/dev/null || grep -q "<packageSources/>" "$cfg_file" 2>/dev/null; then
+                CONFIG_FOLDER_FILE="$cfg_file"
+                break
+              fi
+            fi
+          done
+
+          # Determine which config file to use
+          CONFIG_FILE=""
+          if [ -n "$CONFIG_FOLDER_FILE" ]; then
+            CONFIG_FILE="$CONFIG_FOLDER_FILE"
+            echo "📋 Found valid NuGet config in config folder: $CONFIG_FILE"
+          elif [ -f "nuget.config" ]; then
+            CONFIG_FILE="nuget.config"
+            echo "📋 Found nuget.config in root"
+          elif [ -f "NuGet.config" ]; then
+            CONFIG_FILE="NuGet.config"
+            echo "📋 Found NuGet.config in root"
+          elif [ -f "NuGet.Config" ]; then
+            CONFIG_FILE="NuGet.Config"
+            echo "📋 Found NuGet.Config in root"
+          fi
+
+          if [ -n "$CONFIG_FILE" ]; then
+            echo "✅ Using config file: $CONFIG_FILE"
+            cat "$CONFIG_FILE"
+            dotnet restore "${{ steps.config.outputs.solution_name }}" --configfile "$CONFIG_FILE"
+
+          elif [ -n "${{ inputs.NUGET_CONFIG_CONTENT }}" ]; then
+            echo "📝 Creating custom nuget.config from NUGET_CONFIG_CONTENT..."
+            cat > nuget.config << 'EOF'
+          ${{ inputs.NUGET_CONFIG_CONTENT }}
+          EOF
+
+            echo "✅ Custom nuget.config created"
+            cat nuget.config
+
+            # Restore using custom nuget.config
+            dotnet restore "${{ steps.config.outputs.solution_name }}"
+
+          else
+            echo "📦 Using NUGET_SOURCES for restore..."
+
+            # Build source arguments from space-separated list
+            SOURCES=""
+            for SOURCE in ${{ inputs.NUGET_SOURCES }}; do
+              SOURCES="$SOURCES -s $SOURCE"
+            done
+
+            # Restore with source arguments
+            dotnet restore "${{ steps.config.outputs.solution_name }}" $SOURCES
+          fi
+          
+          echo "✅ Dependencies restored" >> $GITHUB_STEP_SUMMARY
+
+      - name: Determine tool version
+        if: ${{ !inputs.USE_DOCKER }}
+        id: tool-version
+        run: |
+          if [ "${{ inputs.SBOM_TOOL }}" = "cdxgen" ]; then
+            if [ -n "${{ inputs.CDXGEN_VERSION }}" ]; then
+              VERSION="${{ inputs.CDXGEN_VERSION }}"
+            else
+              VERSION="latest"
+            fi
+          else
+            # cyclonedx-dotnet
+            if [ -n "${{ inputs.CYCLONEDX_DOTNET_VERSION }}" ]; then
+              VERSION="${{ inputs.CYCLONEDX_DOTNET_VERSION }}"
+            else
+              VERSION="latest"
+            fi
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Generate SBOM with cdxgen (Docker)
+        if: inputs.SBOM_TOOL == 'cdxgen' && inputs.USE_DOCKER
+        run: |
+          echo "📋 Generating SBOM with cdxgen (Docker - ${{ inputs.DOCKER_DOTNET_VERSION }})..."
+
+          FORMULATION_FLAG=""
+          [ "${{ inputs.INCLUDE_FORMULATION }}" = "true" ] && FORMULATION_FLAG="--include-formulation"
+
+          # Create output directory
+          mkdir -p /tmp/cdxgen-output
+          chmod 777 /tmp/cdxgen-output
+
+          # Run Docker with .NET-specific image
+          docker run --rm \
+            -v "${{ github.workspace }}:/app:ro" \
+            -v /tmp/cdxgen-output:/output:rw \
+            ghcr.io/cyclonedx/cdxgen-debian-${{ inputs.DOCKER_DOTNET_VERSION }}:latest \
+            -r /app \
+            -o /output/${{ inputs.SBOM_FILENAME }} \
+            -t dotnet \
+            --deep \
+            $FORMULATION_FLAG
+
+          # Move SBOM to workspace
+          mv /tmp/cdxgen-output/${{ inputs.SBOM_FILENAME }} ${{ inputs.SBOM_FILENAME }}
+
+          # Cleanup
+          rm -rf /tmp/cdxgen-output
+
+          echo "✅ SBOM generated with Docker" >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate SBOM with cdxgen (Native)
+        if: inputs.SBOM_TOOL == 'cdxgen' && !inputs.USE_DOCKER
+        run: |
+          echo "📋 Generating SBOM with cdxgen (native)..."
+          npm install -g @cyclonedx/cdxgen@${{ steps.tool-version.outputs.version }}
+
+          FORMULATION_FLAG=""
+          [ "${{ inputs.INCLUDE_FORMULATION }}" = "true" ] && FORMULATION_FLAG="--include-formulation"
+
+          cdxgen \
+            -o ${{ inputs.SBOM_FILENAME }} \
+            -t dotnet \
+            --deep \
+            $FORMULATION_FLAG \
+            .
+
+          echo "✅ SBOM generated with native cdxgen" >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate SBOM with CycloneDX .NET
+        if: inputs.SBOM_TOOL == 'cyclonedx-dotnet'
+        working-directory: ${{ inputs.WORKING_DIRECTORY }}
+        run: |
+          echo "📋 Generating SBOM with CycloneDX .NET tool..."
+
+          # Install CycloneDX .NET tool
+          dotnet tool install --global CycloneDX@${{ steps.tool-version.outputs.version }}
+
+          # Generate SBOM
+          dotnet CycloneDX \
+            "${{ steps.config.outputs.solution_name }}" \
+            -o ../ \
+            -f ${{ inputs.SBOM_FILENAME }} \
+            -j
+
+          echo "✅ SBOM generated with CycloneDX .NET" >> $GITHUB_STEP_SUMMARY
+
+      - name: Validate and show SBOM stats
+        run: |
+          [ ! -f "${{ inputs.SBOM_FILENAME }}" ] && echo "❌ SBOM not found" && exit 1
+          [ ! -s "${{ inputs.SBOM_FILENAME }}" ] && echo "❌ SBOM is empty" && exit 1
+
+          FILE_SIZE=$(ls -lh ${{ inputs.SBOM_FILENAME }} | awk '{print $5}')
+          echo "- **File Size**: $FILE_SIZE" >> $GITHUB_STEP_SUMMARY
+
+          if command -v jq &> /dev/null; then
+            if jq empty ${{ inputs.SBOM_FILENAME }} 2>/dev/null; then
+              COMPONENTS=$(jq -r '.components | length' ${{ inputs.SBOM_FILENAME }} 2>/dev/null || echo "N/A")
+              DEPENDENCIES=$(jq -r '.dependencies | length' ${{ inputs.SBOM_FILENAME }} 2>/dev/null || echo "N/A")
+              echo "- **Components**: $COMPONENTS" >> $GITHUB_STEP_SUMMARY
+              echo "- **Dependencies**: $DEPENDENCIES" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ Invalid JSON format" && exit 1
+            fi
+          fi
+
+          echo "✅ SBOM validation passed" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx-dotnet
+          path: ${{ inputs.SBOM_FILENAME }}
+          retention-days: ${{ inputs.ARTIFACT_RETENTION_DAYS }}
+          if-no-files-found: error
+
+      - name: Upload to Dependency-Track
+        uses: DependencyTrack/gh-upload-sbom@v3.1.0
+        with:
+          serverhostname: ${{ inputs.DEPENDENCY_TRACK_HOST }}
+          apikey: ${{ secrets.DEPENDENCY_TRACK_API_KEY }}
+          projectname: ${{ steps.config.outputs.project_name }}
+          projectversion: ${{ steps.config.outputs.project_version }}
+          bomfilename: ${{ inputs.SBOM_FILENAME }}
+          autocreate: ${{ inputs.AUTO_CREATE_PROJECT }}
+
+      - name: SCA Scan Summary
+        if: always()
+        run: |
+          echo "## 📊 SCA Scan Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project**: ${{ steps.config.outputs.project_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.config.outputs.project_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Solution**: ${{ steps.config.outputs.solution_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SBOM Tool**: ${{ inputs.SBOM_TOOL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **SBOM Format**: CycloneDX JSON" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dashboard**: https://${{ inputs.DEPENDENCY_TRACK_FRONTEND_URL }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Projects**: https://${{ inputs.DEPENDENCY_TRACK_FRONTEND_URL }}/projects" >> $GITHUB_STEP_SUMMARY
+          echo "- **SBOM Artifact**: Available in workflow artifacts for ${{ inputs.ARTIFACT_RETENTION_DAYS }} days" >> $GITHUB_STEP_SUMMARY

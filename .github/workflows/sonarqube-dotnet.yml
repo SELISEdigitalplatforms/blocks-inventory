@@ -1,0 +1,397 @@
+name: Reusable - SonarQube .NET Analysis
+
+on:
+  workflow_call:
+    inputs:
+      # General Configuration
+      SOLUTION_NAME:
+        required: true
+        type: string
+        description: "The name of the .NET solution file (e.g., MySolution.sln)"
+      DOTNET_VERSION:
+        required: false
+        type: string
+        default: "8.0.x"
+        description: ".NET version to install"
+      JAVA_VERSION:
+        required: false
+        type: string
+        default: "17"
+        description: "Java version for SonarQube scanner"
+
+      # Tool Versions
+      DOTNET_COVERAGE_VERSION:
+        required: false
+        type: string
+        default: "17.13.1"
+        description: "dotnet-coverage tool version (17.13.1 works with .NET 6+, 17.10.3 for older versions)"
+      DOTNET_SONARSCANNER_VERSION:
+        required: false
+        type: string
+        default: "5.15.0"
+        description: "dotnet-sonarscanner tool version"
+
+      DOTNET_REPORTGENERATOR_VERSION:
+        required: false
+        type: string
+        default: "5.3.11"
+        description: "dotnet-reportgenerator-globaltool version"
+
+      # SonarQube Configuration
+      SONARQUBE_HOST:
+        required: true
+        type: string
+        description: "SonarQube host URL"
+      SONAR_PROJECT_KEY:
+        required: true
+        type: string
+        description: "SonarQube project key"
+      SONAR_ORGANIZATION:
+        required: true
+        type: string
+        description: "SonarQube organization key"
+
+      WORKING_DIRECTORY:
+        required: false
+        type: string
+        description: "The working directory where the solution and projects are located"
+        default: "./src"
+
+      HAS_SUBMODULES:
+        description: "Set to true if repository uses Git submodules"
+        required: false
+        type: boolean
+        default: false
+
+      SKIP_QUALITY_GATE:
+        required: false
+        type: boolean
+        description: "Skip the SonarQube Quality Gate check"
+        default: false
+
+      NUGET_SOURCES:
+        required: false
+        type: string
+        description: "Space-separated list of NuGet sources (used only if no nuget.config exists in repo and NUGET_CONFIG_CONTENT is not provided)"
+        default: "https://api.nuget.org/v3/index.json https://nuget.selise.biz/nuget"
+
+      NUGET_CONFIG_CONTENT:
+        required: false
+        type: string
+        description: "Custom NuGet configuration XML content (optional). Priority: 1) Existing repo nuget.config, 2) This parameter, 3) NUGET_SOURCES. Use this for advanced configuration like allowInsecureConnections."
+        default: ""
+
+    secrets:
+      SONAR_TOKEN:
+        required: true
+        description: "A SonarQube token with analysis permissions"
+      SELISE_GITHUB_PAT:
+        required: false
+        description: "GitHub PAT for private repositories and submodules"
+
+jobs:
+  sonarqube-dotnet-analysis:
+    name: SonarQube .NET Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for accurate SonarQube analysis
+          submodules: ${{ inputs.HAS_SUBMODULES && 'recursive' || 'false' }}
+          token: ${{ secrets.SELISE_GITHUB_PAT || github.token }}
+
+      - name: Update submodules
+        if: inputs.HAS_SUBMODULES
+        run: |
+          git submodule update --init --recursive
+          echo "✅ Submodules updated" >> $GITHUB_STEP_SUMMARY
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: ${{ inputs.JAVA_VERSION }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.DOTNET_VERSION }}
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: |
+            ${{ runner.os }}-sonar
+
+      - name: Cache SonarQube scanner
+        id: cache-sonar-scanner
+        uses: actions/cache@v4
+        with:
+          path: ~/.dotnet/tools
+          key: ${{ runner.os }}-sonar-scanner
+          restore-keys: |
+            ${{ runner.os }}-sonar-scanner
+
+      - name: Install SonarQube scanner and dotnet-coverage
+        run: |
+          dotnet tool install --global dotnet-sonarscanner --version ${{ inputs.DOTNET_SONARSCANNER_VERSION }}
+          dotnet tool install --global dotnet-coverage --version ${{ inputs.DOTNET_COVERAGE_VERSION }}
+
+      - name: SonarQube Analysis
+        working-directory: ${{ inputs.WORKING_DIRECTORY }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is required for pull request decoration
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        shell: bash
+        run: |
+          dotnet-sonarscanner begin \
+              /k:"${{ inputs.SONAR_PROJECT_KEY }}" \
+              /o:"${{ inputs.SONAR_ORGANIZATION }}" \
+              /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
+              /d:sonar.host.url="${{ inputs.SONARQUBE_HOST }}" \
+              /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml \
+              /d:sonar.sources.exclusions="**/obj/**,**/bin/**,**/Migrations/**"
+
+          # NuGet Configuration Priority:
+          # 1. config/*.config folder (validated as NuGet config)
+          # 2. Existing nuget.config in repo (use as-is)
+          # 3. NUGET_CONFIG_CONTENT input (create custom config)
+          # 4. NUGET_SOURCES input (use -s arguments)
+
+          # Check for config folder with any .config/.Config file first (at repo root)
+          # Validate it's a legitimate NuGet config (contains <packageSources>)
+          CONFIG_FOLDER_FILE=""
+          for cfg_file in "$GITHUB_WORKSPACE"/config/*.config "$GITHUB_WORKSPACE"/config/*.Config; do
+            if [ -f "$cfg_file" ]; then
+              if grep -q "<packageSources>" "$cfg_file" 2>/dev/null || grep -q "<packageSources/>" "$cfg_file" 2>/dev/null; then
+                CONFIG_FOLDER_FILE="$cfg_file"
+                break
+              fi
+            fi
+          done
+
+          # Determine which config file to use
+          CONFIG_FILE=""
+          if [ -n "$CONFIG_FOLDER_FILE" ]; then
+            CONFIG_FILE="$CONFIG_FOLDER_FILE"
+            echo "📋 Found valid NuGet config in config folder: $CONFIG_FILE"
+          elif [ -f "nuget.config" ]; then
+            CONFIG_FILE="nuget.config"
+            echo "📋 Found nuget.config in root"
+          elif [ -f "NuGet.config" ]; then
+            CONFIG_FILE="NuGet.config"
+            echo "📋 Found NuGet.config in root"
+          elif [ -f "NuGet.Config" ]; then
+            CONFIG_FILE="NuGet.Config"
+            echo "📋 Found NuGet.Config in root"
+          fi
+
+          if [ -n "$CONFIG_FILE" ]; then
+            echo "✅ Using config file: $CONFIG_FILE"
+            cat "$CONFIG_FILE"
+            dotnet restore "${{ inputs.SOLUTION_NAME }}" --configfile "$CONFIG_FILE"
+
+          elif [ -n "${{ inputs.NUGET_CONFIG_CONTENT }}" ]; then
+            echo "📝 Creating custom nuget.config from NUGET_CONFIG_CONTENT..."
+            cat > nuget.config << 'EOF'
+          ${{ inputs.NUGET_CONFIG_CONTENT }}
+          EOF
+
+            echo "✅ Custom nuget.config created"
+            cat nuget.config
+
+            # Restore using custom nuget.config
+            dotnet restore "${{ inputs.SOLUTION_NAME }}"
+
+          else
+            echo "📦 Using NUGET_SOURCES for restore..."
+
+            # Build source arguments from space-separated list
+            SOURCES=""
+            for SOURCE in ${{ inputs.NUGET_SOURCES }}; do
+              SOURCES="$SOURCES -s $SOURCE"
+            done
+
+            # Restore with -s arguments
+            dotnet restore "${{ inputs.SOLUTION_NAME }}" $SOURCES
+          fi
+
+          dotnet build "${{ inputs.SOLUTION_NAME }}" --no-restore --no-incremental --configuration Release
+
+          # Generate Visual Studio XML coverage for SonarQube
+          dotnet-coverage collect "dotnet test ${{ inputs.SOLUTION_NAME }} --no-build --configuration Release" -f xml -o "coverage.xml"
+
+          dotnet-sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+
+      - name: Upload SonarQube report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-report
+          path: ${{ inputs.WORKING_DIRECTORY }}/.sonarqube/out/.sonar/report-task.txt
+
+      - name: Convert Coverage to Cobertura
+        if: always()
+        working-directory: ${{ inputs.WORKING_DIRECTORY }}
+        shell: bash
+        run: |
+          # Install ReportGenerator (version 4.x for .NET 6+ compatibility)
+          dotnet tool install --global dotnet-reportgenerator-globaltool --version ${{ inputs.DOTNET_REPORTGENERATOR_VERSION }} || true
+
+          # Convert Visual Studio XML to Cobertura
+          reportgenerator \
+            -reports:coverage.xml \
+            -targetdir:coveragereport \
+            -reporttypes:"Cobertura"
+
+          # Copy the Cobertura file to the expected location
+          cp coveragereport/Cobertura.xml coverage.cobertura.xml
+
+          echo "✅ Coverage converted successfully"
+          ls -lh coverage.cobertura.xml
+          cat coverage.cobertura.xml
+
+      - name: Code Coverage Report
+        if: always()
+        id: coverage_report
+        continue-on-error: true
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: ${{ inputs.WORKING_DIRECTORY }}/coverage.cobertura.xml
+          badge: true
+          fail_below_min: false
+          format: markdown
+          hide_branch_rate: false
+          hide_complexity: true
+          indicators: true
+          output: both
+          thresholds: "20 80"
+
+      - name: Create Fallback Coverage Report
+        if: always() && steps.coverage_report.outcome == 'failure'
+        shell: bash
+        run: |
+          cat > code-coverage-results.md << 'EOF'
+          ## ⚠️ Code Coverage Report Unavailable
+
+          Coverage data was not generated for this build. This typically occurs when:
+          - No unit tests are present in the solution
+          - Tests were not executed
+          - Coverage collection failed during test execution
+
+          **Note**: This is common for new projects or projects without test coverage yet.
+
+          ---
+          *💡 Tip: Add unit tests to your project to enable code coverage tracking.*
+          EOF
+
+          echo "✅ Fallback coverage report created"
+
+      - name: Notify Coverage Status
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.coverage_report.outcome }}" == "success" ]; then
+            echo "✅ Code coverage report generated successfully"
+          elif [ "${{ steps.coverage_report.outcome }}" == "failure" ]; then
+            echo "⚠️ WARNING: Code coverage data is unavailable"
+            echo "This is typically because:"
+            echo "  - No unit tests exist in the solution"
+            echo "  - Tests did not execute"
+            echo "  - Coverage collection failed"
+            echo ""
+            echo "The workflow will continue, but coverage metrics are not available."
+          fi
+
+      - name: Generate Workflow Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## 📊 SonarQube Analysis Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project**: \`${{ inputs.SONAR_PROJECT_KEY }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Organization**: \`${{ inputs.SONAR_ORGANIZATION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Solution**: \`${{ inputs.SOLUTION_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **.NET Version**: \`${{ inputs.DOTNET_VERSION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **SonarQube Host**: [${{ inputs.SONARQUBE_HOST }}](${{ inputs.SONARQUBE_HOST }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dashboard**: [${{ inputs.SONARQUBE_HOST }}/dashboard?id=${{ inputs.SONAR_PROJECT_KEY }}](${{ inputs.SONARQUBE_HOST }}/dashboard?id=${{ inputs.SONAR_PROJECT_KEY }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Quality Gate**: ${{ inputs.SKIP_QUALITY_GATE && '⏭️ Skipped' || '✅ Will be checked' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## 📊 Code Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Add coverage status indicator
+          if [ "${{ steps.coverage_report.outcome }}" == "success" ]; then
+            echo "**Status**: ✅ Coverage data available" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.coverage_report.outcome }}" == "failure" ]; then
+            echo "**Status**: ⚠️ Coverage data unavailable (no tests or coverage collection failed)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -f "code-coverage-results.md" ]; then
+            cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Coverage report file not found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Add Coverage PR Comment
+        if: github.event_name == 'pull_request' && always() && hashFiles('code-coverage-results.md') != ''
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          recreate: true
+          path: code-coverage-results.md
+
+  sonarqube-quality-gate:
+    name: SonarQube Quality Gate Check
+    runs-on: ubuntu-latest
+    needs: sonarqube-dotnet-analysis
+    if: ${{ !inputs.SKIP_QUALITY_GATE }}
+    permissions:
+      contents: read
+    steps:
+      - name: Download SonarQube report
+        uses: actions/download-artifact@v4
+        with:
+          name: sonar-report
+          path: ./sonar-report/
+
+      - name: SonarQube Quality Gate Check
+        id: quality-gate
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ inputs.SONARQUBE_HOST }}
+        with:
+          scanMetadataReportFile: ./sonar-report/report-task.txt
+
+      - name: Quality Gate Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## 🎯 Quality Gate Result" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.quality-gate.outcome }}" == "success" ]; then
+            echo "### ✅ Quality Gate Passed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All quality criteria met! Your code meets the required standards." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Quality Gate Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Quality gate conditions not met. Please review the issues in SonarQube." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**View Details**: [${{ inputs.SONARQUBE_HOST }}/dashboard?id=${{ inputs.SONAR_PROJECT_KEY }}](${{ inputs.SONARQUBE_HOST }}/dashboard?id=${{ inputs.SONAR_PROJECT_KEY }})" >> $GITHUB_STEP_SUMMARY
