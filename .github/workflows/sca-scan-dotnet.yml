@@ -206,7 +206,7 @@ jobs:
 
       - name: Setup .NET SDK
         if: ${{ !inputs.USE_DOCKER }}
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ inputs.DOTNET_VERSION }}
 
