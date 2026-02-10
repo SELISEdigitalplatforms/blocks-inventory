@@ -447,7 +447,7 @@ jobs:
           echo "✅ SBOM validation passed" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: sbom-cyclonedx-dotnet
           path: ${{ inputs.SBOM_FILENAME }}
