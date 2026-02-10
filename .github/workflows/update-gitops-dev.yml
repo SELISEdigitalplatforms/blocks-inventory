@@ -73,7 +73,7 @@ jobs:
 
     steps:
       - name: Checkout GitOps Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ inputs.GITOPS_REPO }}
           token: ${{ secrets.SELISE_GITHUB_PAT }}
