@@ -11,6 +11,7 @@ permissions:
   contents: read
   checks: write
   pull-requests: write
+  issues: write
 jobs:
   build:
     name: Test Execution
@@ -56,4 +57,4 @@ jobs:
         if: always()
         with:
           files: "./src/XUnitTest/test-results/*.xml"
-          comment_mode: ${{ inputs.COMMENT_RESULTS && 'always' || 'off' }}
+          comment_mode: ${{ inputs.COMMENT_RESULTS && github.event_name == 'pull_request' && 'always' || 'off' }}
