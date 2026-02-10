@@ -52,7 +52,7 @@ jobs:
           Get-Content coverage-report/Summary.txt
 
       - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@4a2f0813705cbec5ca60db5218954b492bd80168 # v1
+        uses: EnricoMi/publish-unit-test-result-action@b9f6c61d965bcaa18acc02d6daf706373a448f02 # v1
         id: test-results
         if: always()
         with:
