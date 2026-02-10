@@ -212,7 +212,7 @@ jobs:
 
       - name: Setup Node.js (for native cdxgen)
         if: inputs.SBOM_TOOL == 'cdxgen' && !inputs.USE_DOCKER
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
 
