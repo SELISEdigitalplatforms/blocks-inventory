@@ -190,7 +190,7 @@ jobs:
 
       - name: Cache Docker layers
         if: inputs.SBOM_TOOL == 'cdxgen' && inputs.USE_DOCKER
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-cdxgen-dotnet-${{ github.sha }}
