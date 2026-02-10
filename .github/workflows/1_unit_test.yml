@@ -10,7 +10,7 @@ on:
 permissions:
   contents: read
   checks: write
-  pull-requests: read
+  pull-requests: write
 jobs:
   build:
     name: Test Execution
