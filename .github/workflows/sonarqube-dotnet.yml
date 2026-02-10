@@ -231,7 +231,7 @@ jobs:
           dotnet-sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
       - name: Upload SonarQube report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: sonar-report
           path: ${{ inputs.WORKING_DIRECTORY }}/.sonarqube/out/.sonar/report-task.txt
