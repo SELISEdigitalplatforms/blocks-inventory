@@ -114,7 +114,7 @@ jobs:
           Triggered by: ${{ github.repository }}@${{ github.sha }}"
 
           # Retry logic with exponential backoff
-          MAX_RETRIES=5
+          MAX_RETRIES=7
           RETRY=0
           BASE_DELAY=3
 
