@@ -168,7 +168,7 @@
         }
       }
     ],
-    "mailbox": [
+    "worker-mailbox": [
       {
         "version": "",
         "file": "blocks-communication-net-v1-mailbox.values.yaml",
