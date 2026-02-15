@@ -31,7 +31,7 @@ permissions:
   contents: read
 
 env:
-  SERVICE_TYPE: worker-mailbox
+  SERVICE_TYPE: mailbox-worker
 
 jobs:
   build-tag:
