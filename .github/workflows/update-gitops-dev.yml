@@ -295,8 +295,13 @@ jobs:
               if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
                 echo "⚠️ Push failed (likely due to concurrent update)"
                 echo "⚠️ Attempt $ATTEMPT failed - concurrent update detected" >> $GITHUB_STEP_SUMMARY
-                
-                # Pull latest changes and rebase our commit
+
+                # Wait first to let concurrent pushes settle
+                WAIT_TIME=$((BASE_DELAY * RETRY_COUNT + RANDOM % 3))
+                echo "⏳ Waiting ${WAIT_TIME} seconds before retry $((RETRY_COUNT + 1))..."
+                sleep $WAIT_TIME
+
+                # Then pull latest changes and rebase right before pushing
                 echo "🔄 Pulling latest changes and rebasing..."
                 if git pull --rebase origin ${{ inputs.GITOPS_BRANCH }}; then
                   echo "✅ Rebase successful, will retry push"
@@ -317,11 +322,6 @@ jobs:
                     git rebase --continue || echo "Rebase completed with resolution"
                   fi
                 fi
-                
-                # Exponential backoff with jitter
-                WAIT_TIME=$((BASE_DELAY * RETRY_COUNT + RANDOM % 3))
-                echo "⏳ Waiting ${WAIT_TIME} seconds before retry $((RETRY_COUNT + 1))..."
-                sleep $WAIT_TIME
               else
                 echo "❌ Failed to push after $MAX_RETRIES attempts" | tee -a $GITHUB_STEP_SUMMARY
                 echo "" >> $GITHUB_STEP_SUMMARY
