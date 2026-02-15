@@ -133,8 +133,14 @@ jobs:
 
             RETRY=$((RETRY + 1))
             if [ $RETRY -lt $MAX_RETRIES ]; then
-              echo "Push failed, rebasing and retrying..."
+              echo "Push failed, waiting before retry..."
 
+              # Wait first to let concurrent pushes settle
+              WAIT=$((BASE_DELAY * RETRY + RANDOM % 3))
+              echo "Waiting ${WAIT}s before retry..."
+              sleep $WAIT
+
+              # Then pull latest changes and rebase right before pushing
               if git pull --rebase origin ${{ env.GITOPS_BRANCH }}; then
                 echo "Rebase successful"
               else
@@ -142,10 +148,6 @@ jobs:
                 git rebase --abort
                 exit 1
               fi
-
-              WAIT=$((BASE_DELAY * RETRY + RANDOM % 3))
-              echo "Waiting ${WAIT}s before retry..."
-              sleep $WAIT
             fi
           done
 
