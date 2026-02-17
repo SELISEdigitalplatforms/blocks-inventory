@@ -1,1 +1,2 @@
 blocksos/blocks-utilities-net-worker:04c68ba--26.02.6
+blocksos/blocks-utilities-net-worker:04c68ba--26.02.7
