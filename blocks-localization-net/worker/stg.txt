@@ -3,3 +3,4 @@ blocksos/blocks-localization-net-worker:543c512-117-26.02.39
 blocksos/blocks-localization-net-worker:bd76be6-121-26.02.48
 blocksos/blocks-localization-net-worker:388d03d--26.02.50
 blocksos/blocks-localization-net-worker:20748a4-125-26.02.51
+blocksos/blocks-localization-net-worker:8c6a45b--26.02.55
