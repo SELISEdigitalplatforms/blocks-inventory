@@ -2,3 +2,4 @@ blocksos/blocks-communication-net-worker:60bc3fe-30-26.02.8
 blocksos/blocks-communication-net-worker:fc46a24--26.02.13
 blocksos/blocks-communication-net-worker:da75bc6--26.02.14
 blocksos/blocks-communication-net-worker:3f98230--26.02.17
+blocksos/blocks-communication-net-worker:4c2efee--26.02.18
