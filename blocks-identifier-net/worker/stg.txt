@@ -5,3 +5,4 @@ blocksos/blocks-identifier-net-worker:3b3f7c8--26.02.20
 blocksos/blocks-identifier-net-worker:23d2102-71-26.02.22
 blocksos/blocks-identifier-net-worker:46376f2-72-26.02.23
 blocksos/blocks-identifier-net-worker:a026d6e--26.02.26
+blocksos/blocks-identifier-net-worker:ed85f0b-74-26.02.27
