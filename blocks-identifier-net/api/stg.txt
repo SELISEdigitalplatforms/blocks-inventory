@@ -4,3 +4,4 @@ blocksos/blocks-identifier-net-api:5f60fde-68-26.02.18
 blocksos/blocks-identifier-net-api:3b3f7c8--26.02.20
 blocksos/blocks-identifier-net-api:23d2102-71-26.02.22
 blocksos/blocks-identifier-net-api:46376f2-72-26.02.23
+blocksos/blocks-identifier-net-api:a026d6e--26.02.26
