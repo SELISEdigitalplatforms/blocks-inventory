@@ -5,3 +5,4 @@ blocksos/blocks-communication-net-worker:3f98230--26.02.17
 blocksos/blocks-communication-net-worker:4c2efee--26.02.18
 blocksos/blocks-communication-net-worker:4c2efee-35-26.02.19
 blocksos/blocks-communication-net-worker:78f4901-37-26.02.23
+blocksos/blocks-communication-net-worker:2273897-38-26.02.24
