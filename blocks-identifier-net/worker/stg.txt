@@ -8,3 +8,4 @@ blocksos/blocks-identifier-net-worker:a026d6e--26.02.26
 blocksos/blocks-identifier-net-worker:ed85f0b-74-26.02.27
 blocksos/blocks-identifier-net-worker:1a180e0-88-26.02.38
 blocksos/blocks-identifier-net-worker:017a006--26.02.40
+blocksos/blocks-identifier-net-worker:11e8e4c-89-26.02.41
