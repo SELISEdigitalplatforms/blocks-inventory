@@ -1,0 +1,71 @@
+name: Run Tests
+
+on:
+  workflow_call:
+    inputs:
+      COMMENT_RESULTS:
+        description: "Whether to post PR comments with test results"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  test:
+    name: Test Execution
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set Environment Variables
+        uses: ./.github/actions/setvars
+        with:
+          varFilePath: ./.github/variables/vars.env
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Tests
+        run: npm run test:ci
+        # Expects JUnit XML output in ./test-results/*.xml
+        # For Jest: configure jest-junit reporter in jest.config.*
+        #   reporters: ['default', ['jest-junit', { outputDirectory: 'test-results', outputName: 'results.xml' }]]
+        # For Vitest: configure vitest-junit reporter
+        #   reporters: ['verbose', ['junit', { outputFile: 'test-results/results.xml' }]]
+
+      - name: Show Coverage Summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            echo "### Test Coverage Summary" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            jq '.total | to_entries[] | "\(.key): \(.value.pct)%"' -r coverage/coverage-summary.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          elif [ -f coverage/lcov.info ]; then
+            echo "Coverage report available at \`coverage/lcov.info\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No coverage report found" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@b9f6c61d965bcaa18acc02d6daf706373a448f02 # v1
+        id: test-results
+        if: always()
+        with:
+          files: "./test-results/*.xml"
+          comment_mode: ${{ inputs.COMMENT_RESULTS && github.event_name == 'pull_request' && 'always' || 'off' }}

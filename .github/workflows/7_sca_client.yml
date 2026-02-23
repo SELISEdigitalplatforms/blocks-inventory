@@ -24,17 +24,19 @@ jobs:
         with:
           varFilePath: ./.github/variables/vars.env
 
-      - name: Restore Dependencies
-        working-directory: ./src
-        run: |
-          # dotnet restore "./${{ env.SOLUTION_NAME }}" -s https://api.nuget.org/v3/index.json -s https://nuget.selise.biz/nuget
-          dotnet restore "./${{ env.SOLUTION_NAME }}" --configfile ../config/NuGetPackageSource.Config
-
-      - name: Generate CycloneDX SBOM (JSON) for .NET
-        uses: CycloneDX/gh-dotnet-generate-sbom@c183e4ac30e5b99354cb9a98c38548e07c538346 # v1.0.1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          path: ./src/${{ env.SOLUTION_NAME }}
-          json: true
+          node-version: 20.x
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Generate CycloneDX SBOM (JSON) for Node.js
+        run: |
+          npm install -g @cyclonedx/cyclonedx-npm
+          cyclonedx-npm --output-format json --output-file bom.json
 
       - name: Upload SBOM as a workflow artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0

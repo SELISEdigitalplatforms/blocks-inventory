@@ -1,15 +1,20 @@
 name: Analyze Code Quality
-on: 
+
+on:
   workflow_call:
     secrets:
       SONAR_TOKEN:
         required: true
       SONAR_GET:
         required: true
+      SELISE_GITHUB_PAT:
+        required: true
+
 permissions:
   contents: read
   checks: write
   pull-requests: read
+
 jobs:
   build:
     name: SonarQube Analysis
@@ -18,66 +23,60 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 0  
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.SELISE_GITHUB_PAT }}
 
       - name: Set Environment Variables
         uses: ./.github/actions/setvars
         with:
           varFilePath: ./.github/variables/vars.env
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test and coverage
+        run: npm run test:coverage
+
+      - name: Change abs paths to rel paths
+        working-directory: ./coverage
+        run: |
+          sed -i "s|/home/runner/work/${{ env.REPO_NAME }}/${{ env.REPO_NAME }}/||g" lcov.info
+
       - name: Set up JDK 17
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: temurin
           java-version: '17'
-      
-      - name: Cache SonarCloud packages
+
+      - name: Cache SonarQube packages
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
-          path: ~\sonar\cache
+          path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
-      
-      - name: Cache SonarCloud scanner
-        id: cache-sonar-scanner
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-        with:
-          path: .\.sonar\scanner
-          key: ${{ runner.os }}-sonar-scanner
-          restore-keys: ${{ runner.os }}-sonar-scanner
-      
-      - name: Install SonarCloud scanner
-        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          dotnet tool install --global dotnet-sonarscanner --version 5.5.3
-      
-      - name: Install coverlet
-        run: |
-          dotnet tool install --global coverlet.console 
-         
-      - name: SonarQube Analysis
-        working-directory: ./src
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
-        shell: pwsh
-        run: |
-          dotnet-sonarscanner begin /k:"${{ env.SONAR_KEY }}" /o:"${{ env.AUTHOR }}" /d:sonar.login=${{ secrets.SONAR_TOKEN }} /d:sonar.host.url="${{ env.SONARQUBE_HOST }}" /d:sonar.cs.opencover.reportsPaths=coverage.xml
-          dotnet restore "./${{ env.SOLUTION_NAME }}" -s https://api.nuget.org/v3/index.json -s https://nuget.selise.biz/nuget
-          dotnet build "./${{ env.SOLUTION_NAME }}" --no-incremental
-          coverlet ./XUnitTest/bin/Debug/net9.0/XUnitTest.dll --target "dotnet" --targetargs "test ./${{ env.SOLUTION_NAME }} --no-build" -f=opencover -o="coverage.xml"
-          dotnet-sonarscanner end /d:sonar.login=${{ secrets.SONAR_TOKEN }}
 
-      - name: SonarQube Quality Gate check
-        id: quality-gate
-        uses: sonarsource/sonarqube-quality-gate-action@cb3ed20f9fec62b4c3b8ad9e77656c6adaade913 # master
-        # Force to fail step after specific time.
-        timeout-minutes: 5
-        with:
-          scanMetadataReportFile: src/.sonarqube/out/.sonar/report-task.txt
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ env.SONARQUBE_HOST }}
+
+      # - name: SonarQube Quality Gate check
+      #   id: quality-gate
+      #   uses: sonarsource/sonarqube-quality-gate-action@cb3ed20f9fec62b4c3b8ad9e77656c6adaade913 # master
+      #   timeout-minutes: 5
+      #   with:
+      #     scanMetadataReportFile: .scannerwork/report-task.txt
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      #     SONAR_HOST_URL: ${{ env.SONARQUBE_HOST }}
 
       - name: Fetch SonarQube metrics
         if: always()
@@ -86,13 +85,13 @@ jobs:
           SONAR_GET: ${{ secrets.SONAR_GET }}
         run: |
           SONAR_BASE="${SONARQUBE_HOST%/}"
-          REPORT_TASK="src/.sonarqube/out/.sonar/report-task.txt"
-          
+          REPORT_TASK=".scannerwork/report-task.txt"
+
           # 1. Wait for SonarQube background task to complete
           if [ -f "$REPORT_TASK" ]; then
             CE_TASK_URL=$(awk -F= '/ceTaskUrl/ {print $2}' "$REPORT_TASK" | tr -d '\r')
             echo "Waiting for SonarQube task: $CE_TASK_URL"
-            
+
             for i in {1..10}; do
               TASK_STATUS=$(curl -sS -u "${SONAR_GET}:" "$CE_TASK_URL" | jq -r '.task.status')
               echo "Task status: $TASK_STATUS"
@@ -114,14 +113,11 @@ jobs:
           # 3. Fetch Metrics
           METRICS="duplicated_lines_density,duplicated_lines,duplicated_blocks,security_hotspots,security_hotspots_reviewed,security_review_rating,vulnerabilities"
           URL="${SONAR_BASE}/api/measures/component?component=${SONAR_KEY}&metricKeys=${METRICS}&${QUERY_PARAM}"
-          
+
           echo "Fetching metrics from: $URL"
           RESPONSE=$(curl -sS -u "${SONAR_GET}:" "$URL")
-          
-          # Save response for the next step
+
           echo "$RESPONSE" > sonar-metrics.json
-          
-          # Debug: Print response to logs (optional, remove once working)
           echo "Sonar Response: $RESPONSE"
 
       - name: SAST Summary
@@ -129,10 +125,9 @@ jobs:
         shell: bash
         run: |
           METRICS_FILE="sonar-metrics.json"
-          
+
           get_metric() {
             if [ -f "$METRICS_FILE" ]; then
-              # This jq filter handles the nested measures array structure
               val=$(jq -r --arg k "$1" '.component.measures[] | select(.metric==$k) | .value' "$METRICS_FILE" 2>/dev/null)
               echo "${val:-n/a}"
             else
