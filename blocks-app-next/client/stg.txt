@@ -1,1 +1,2 @@
 blocksos/blocks-app-next-client:ddb9155--26.02.4
+blocksos/blocks-app-next-client:81837ba--26.02.5
