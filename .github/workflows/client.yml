@@ -11,6 +11,10 @@ on:
         description: "PR number for main flow"
         required: false
         type: string
+      CI_BUILD:
+        description: "CI value for build flow"
+        required: true
+        type: string
     outputs:
       image_tag:
         description: "The image tag produced by the build"
