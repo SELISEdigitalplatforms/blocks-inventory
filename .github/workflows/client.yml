@@ -106,7 +106,7 @@ jobs:
 
       - name: Build and push image
         run: |
-          docker build -t "${image_name}:${image_tag}" --file "${DOCKERFILE}" --build-arg build_version="${semantic_version}" .
+          docker build -t "${image_name}:${image_tag}" --file "${DOCKERFILE}" --build-arg build_version="${semantic_version}" --build-arg ci_build="${{ inputs.CI_BUILD }}" .
           docker push "${image_name}:${image_tag}"
 
       - name: Resolve image digest
