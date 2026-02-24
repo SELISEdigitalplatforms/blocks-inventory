@@ -101,7 +101,7 @@ jobs:
           done < <(find . -name "enterprise.txt" -type f | sort)
 
           # ── Phase 2: Create PRs per service ──
-          if [ ${#SVC_DATA[@]} -gt 0 ]; then
+          if [ "$UPDATES" -gt 0 ]; then
             echo "### Updates" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "| Service | Type | Source | Enterprise Version | New Version | Status |" >> "$GITHUB_STEP_SUMMARY"
