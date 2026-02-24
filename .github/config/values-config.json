@@ -218,5 +218,19 @@
         }
       }
     ]
+  },
+  "blocks-app-next": {
+    "client": [
+      {
+        "version": "",
+        "file": "blocks-app-next-client.values.yaml",
+        "cluster": {
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
   }
 }
