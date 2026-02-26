@@ -1,1 +1,2 @@
 blocksos/blocks-communication-net-mailbox-worker:2273897-38-26.02.24
+blocksos/blocks-communication-net-mailbox-worker:126fa38-44-26.02.30
