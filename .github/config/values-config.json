@@ -232,5 +232,73 @@
         }
       }
     ]
+  },
+  "blocks-utilities-net": {
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-utilities-net-worker.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-utilities-net-v1-api.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
+  },
+  "blocks-cloudconfiguration-net": {
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-cloudconfiguration-net-worker.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-cloudconfiguration-net-v1-api.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
   }
 }
