@@ -1,30 +1,10 @@
 {
-  "blocks-localization-net": {
-    "worker": [
+  "blocks-app-next": {
+    "client": [
       {
         "version": "",
-        "file": "blocks-localization-net-worker.values.yaml",
+        "file": "blocks-app-next-client.values.yaml",
         "cluster": {
-          "prod": [
-            "aks-blocks-prod",
-            "aks-blocks-nonprod"
-          ],
-          "stg": [
-            "aks-blocks-stg",
-            "aks-blocks-stg-nonprod"
-          ]
-        }
-      }
-    ],
-    "api": [
-      {
-        "version": "",
-        "file": "blocks-localization-net-v1-api.values.yaml",
-        "cluster": {
-          "prod": [
-            "aks-blocks-prod",
-            "aks-blocks-nonprod"
-          ],
           "stg": [
             "aks-blocks-stg",
             "aks-blocks-stg-nonprod"
@@ -33,11 +13,11 @@
       }
     ]
   },
-  "blocks-idp-net": {
+  "blocks-cloudconfiguration-net": {
     "worker": [
       {
         "version": "",
-        "file": "blocks-idp-net-worker.values.yaml",
+        "file": "blocks-cloudconfiguration-net-worker.values.yaml",
         "cluster": {
           "prod": [
             "aks-blocks-prod",
@@ -53,75 +33,7 @@
     "api": [
       {
         "version": "",
-        "file": "blocks-idp-net-v1-api.values.yaml",
-        "cluster": {
-          "prod": [
-            "aks-blocks-prod",
-            "aks-blocks-nonprod"
-          ],
-          "stg": [
-            "aks-blocks-stg",
-            "aks-blocks-stg-nonprod"
-          ]
-        }
-      }
-    ]
-  },
-  "blocks-identifier-net": {
-    "worker": [
-      {
-        "version": "",
-        "file": "blocks-identifier-net-worker.values.yaml",
-        "cluster": {
-          "prod": [
-            "aks-blocks-prod",
-            "aks-blocks-nonprod"
-          ],
-          "stg": [
-            "aks-blocks-stg",
-            "aks-blocks-stg-nonprod"
-          ]
-        }
-      }
-    ],
-    "api": [
-      {
-        "version": "",
-        "file": "blocks-identifier-net-v1-api.values.yaml",
-        "cluster": {
-          "prod": [
-            "aks-blocks-prod",
-            "aks-blocks-nonprod"
-          ],
-          "stg": [
-            "aks-blocks-stg",
-            "aks-blocks-stg-nonprod"
-          ]
-        }
-      }
-    ]
-  },
-  "blocks-lmt-net": {
-    "worker": [
-      {
-        "version": "",
-        "file": "blocks-lmt-net-worker.values.yaml",
-        "cluster": {
-          "prod": [
-            "aks-blocks-prod",
-            "aks-blocks-nonprod"
-          ],
-          "stg": [
-            "aks-blocks-stg",
-            "aks-blocks-stg-nonprod"
-          ]
-        }
-      }
-    ],
-    "api": [
-      {
-        "version": "",
-        "file": "blocks-lmt-net-v1-api.values.yaml",
+        "file": "blocks-cloudconfiguration-net-v1-api.values.yaml",
         "cluster": {
           "prod": [
             "aks-blocks-prod",
@@ -185,6 +97,142 @@
       }
     ]
   },
+  "blocks-identifier-net": {
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-identifier-net-worker.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-identifier-net-v1-api.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
+  },
+  "blocks-idp-net": {
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-idp-net-worker.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-idp-net-v1-api.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
+  },
+  "blocks-localization-net": {
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-localization-net-worker.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-localization-net-v1-api.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
+  },
+  "blocks-lmt-net": {
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-lmt-net-worker.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-lmt-net-v1-api.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
+  },
   "blocks-uds-net": {
     "worker": [
       {
@@ -219,20 +267,6 @@
       }
     ]
   },
-  "blocks-app-next": {
-    "client": [
-      {
-        "version": "",
-        "file": "blocks-app-next-client.values.yaml",
-        "cluster": {
-          "stg": [
-            "aks-blocks-stg",
-            "aks-blocks-stg-nonprod"
-          ]
-        }
-      }
-    ]
-  },
   "blocks-utilities-net": {
     "worker": [
       {
@@ -254,40 +288,6 @@
       {
         "version": "",
         "file": "blocks-utilities-net-v1-api.values.yaml",
-        "cluster": {
-          "prod": [
-            "aks-blocks-prod",
-            "aks-blocks-nonprod"
-          ],
-          "stg": [
-            "aks-blocks-stg",
-            "aks-blocks-stg-nonprod"
-          ]
-        }
-      }
-    ]
-  },
-  "blocks-cloudconfiguration-net": {
-    "worker": [
-      {
-        "version": "",
-        "file": "blocks-cloudconfiguration-net-worker.values.yaml",
-        "cluster": {
-          "prod": [
-            "aks-blocks-prod",
-            "aks-blocks-nonprod"
-          ],
-          "stg": [
-            "aks-blocks-stg",
-            "aks-blocks-stg-nonprod"
-          ]
-        }
-      }
-    ],
-    "api": [
-      {
-        "version": "",
-        "file": "blocks-cloudconfiguration-net-v1-api.values.yaml",
         "cluster": {
           "prod": [
             "aks-blocks-prod",
