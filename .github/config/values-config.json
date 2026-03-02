@@ -80,7 +80,7 @@
         }
       }
     ],
-    "worker-mailbox": [
+    "mailbox-worker": [
       {
         "version": "",
         "file": "blocks-communication-net-v1-mailbox.values.yaml",
