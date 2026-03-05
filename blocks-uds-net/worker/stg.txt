@@ -1,1 +1,2 @@
 blocksos/blocks-uds-net-worker:0a450b6--26.03.6
+blocksos/blocks-uds-net-worker:a42e373-96-26.03.8
