@@ -231,6 +231,22 @@
           ]
         }
       }
+    ],
+    "client": [
+      {
+        "version": "",
+        "file": "blocks-lmt-net-client.values.yaml",
+        "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
     ]
   },
   "blocks-uds-net": {
