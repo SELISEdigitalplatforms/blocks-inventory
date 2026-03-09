@@ -125,6 +125,9 @@ jobs:
             anchore/syft:latest "${image_digest_ref}" -o cyclonedx-json > "${SBOM_FILE}" || SYFT_OK=$?
 
           if [ "${SYFT_OK}" -ne 0 ]; then
+            docker system prune -af
+            docker builder prune -af
+            df -h
             docker run --rm \
               -v /var/run/docker.sock:/var/run/docker.sock \
               -v "$PWD:/work" \
