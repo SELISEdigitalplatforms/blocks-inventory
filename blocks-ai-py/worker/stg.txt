@@ -1,1 +1,2 @@
 blocksos/blocks-ai-py-worker:045e41a--26.03.8
+blocksos/blocks-ai-py-worker:b8201c9--26.03.8
