@@ -1,1 +1,2 @@
 blocksos/blocks-cloudbuild-net-worker:5f8ef08-69-26.03.5
+blocksos/blocks-cloudbuild-net-worker:309ecbb-293-26.03.6
