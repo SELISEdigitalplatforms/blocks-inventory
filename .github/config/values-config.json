@@ -39,6 +39,32 @@
       }
     ]
   },
+  "blocks-cloudbuild-net": {
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-cloudbuild-net-v1-api.values.yaml",
+        "cluster": {
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-cloudbuild-net-worker.values.yaml",
+        "cluster": {
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
+  },
   "blocks-cloudconfiguration-net": {
     "worker": [
       {
