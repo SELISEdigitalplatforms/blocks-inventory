@@ -10,3 +10,4 @@ blocksos/blocks-app-next-client:4d9cc42--26.03.61
 blocksos/blocks-app-next-client:491c6ae--26.03.62
 blocksos/blocks-app-next-client:491c6ae--26.03.63
 blocksos/blocks-app-next-client:eea2078--26.03.66
+blocksos/blocks-app-next-client:9dd1ce2--26.03.70
