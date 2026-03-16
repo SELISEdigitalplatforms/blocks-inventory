@@ -1,1 +1,2 @@
 blocksos/blocks-communication-net-worker:126fa38-44-26.02.30
+blocksos/blocks-communication-net-worker:f794f33-53-26.03.8
