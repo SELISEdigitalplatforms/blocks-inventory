@@ -25,6 +25,32 @@
       }
     ]
   },
+  "blocks-alert-net": {
+    "api": [
+      {
+        "version": "",
+        "file": "blocks-alert-net-v1-api.values.yaml",
+        "cluster": {
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ],
+    "worker": [
+      {
+        "version": "",
+        "file": "blocks-alert-net-worker.values.yaml",
+        "cluster": {
+          "stg": [
+            "aks-blocks-stg",
+            "aks-blocks-stg-nonprod"
+          ]
+        }
+      }
+    ]
+  },
   "blocks-app-next": {
     "client": [
       {
