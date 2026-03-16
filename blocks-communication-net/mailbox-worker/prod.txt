@@ -1,2 +1,2 @@
 blocksos/blocks-communication-net-mailbox-worker:126fa38-44-26.02.30
-blocksos/blocks-communication-net-mailbox-worker:f794f33-53-26.03.8
+blocksos/blocks-communication-net-mailbox-worker:f794f33-53-26.03.8 
