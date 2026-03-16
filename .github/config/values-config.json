@@ -161,7 +161,7 @@
     "mailbox-worker": [
       {
         "version": "",
-        "file": "blocks-communication-net-v1-mailbox.values.yaml",
+        "file": "blocks-communication-net-mailbox-worker.values.yaml",
         "cluster": {
           "prod": [
             "aks-blocks-prod",
