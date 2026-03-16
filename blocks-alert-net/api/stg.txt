@@ -1,1 +1,2 @@
 blocksos/blocks-alert-net-api:7083baf-69-26.03.4
+blocksos/blocks-alert-net-api:ce6a68b-70-26.03.5
