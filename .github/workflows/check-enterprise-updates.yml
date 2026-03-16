@@ -146,12 +146,12 @@ jobs:
                   if [ -n "$EXISTING" ] && [ "$EXISTING" != "null" ]; then
                     PR_NUM=$(echo "$EXISTING" | jq -r '.number')
                     PR_URL=$(echo "$EXISTING" | jq -r '.url')
-                    gh pr edit "$PR_NUM" --repo "$REPO" --body "$PR_BODY" 2>/dev/null || true
+                    gh pr edit "$PR_NUM" --repo "$REPO" --body "$PR_BODY" --add-label "enterprise" --add-assignee "teknatha136" 2>/dev/null || true
                     PRS_UPDATED=$((PRS_UPDATED + 1))
                     STATUS="[PR #${PR_NUM}](${PR_URL}) updated"
                   else
                     PR_TITLE="Enterprise update: ${SVC} (from ${SOURCE_ENV})"
-                    if PR_URL=$(gh pr create --repo "$REPO" --title "$PR_TITLE" --body "$PR_BODY" --head "$BRANCH" --base main 2>/dev/null); then
+                    if PR_URL=$(gh pr create --repo "$REPO" --title "$PR_TITLE" --body "$PR_BODY" --head "$BRANCH" --base main --label "enterprise" --assignee "teknatha136" 2>/dev/null); then
                       PR_NUM=$(basename "$PR_URL")
                       PRS_CREATED=$((PRS_CREATED + 1))
                       STATUS="[PR #${PR_NUM}](${PR_URL}) created"
