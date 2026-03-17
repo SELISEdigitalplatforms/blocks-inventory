@@ -57,6 +57,10 @@
         "version": "",
         "file": "blocks-app-next-client.values.yaml",
         "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
           "stg": [
             "aks-blocks-stg",
             "aks-blocks-stg-nonprod"
