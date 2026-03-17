@@ -1,1 +1,1 @@
-blocksos/blocks-app-next-client:148ea84--26.03.88
+blocksos/blocks-app-next-client:148ea84--26.03.88 
