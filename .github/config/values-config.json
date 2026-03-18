@@ -5,6 +5,10 @@
         "version": "",
         "file": "blocks-ai-py-api.values.yaml",
         "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
           "stg": [
             "aks-blocks-stg",
             "aks-blocks-stg-nonprod"
@@ -17,6 +21,10 @@
         "version": "",
         "file": "blocks-ai-py-worker.values.yaml",
         "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
           "stg": [
             "aks-blocks-stg",
             "aks-blocks-stg-nonprod"
@@ -31,6 +39,10 @@
         "version": "",
         "file": "blocks-alert-net-v1-api.values.yaml",
         "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
           "stg": [
             "aks-blocks-stg",
             "aks-blocks-stg-nonprod"
@@ -43,6 +55,10 @@
         "version": "",
         "file": "blocks-alert-net-worker.values.yaml",
         "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
           "stg": [
             "aks-blocks-stg",
             "aks-blocks-stg-nonprod"
@@ -75,6 +91,10 @@
         "version": "",
         "file": "blocks-cloudbuild-net-v1-api.values.yaml",
         "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
           "stg": [
             "aks-blocks-stg",
             "aks-blocks-stg-nonprod"
@@ -87,6 +107,10 @@
         "version": "",
         "file": "blocks-cloudbuild-net-worker.values.yaml",
         "cluster": {
+          "prod": [
+            "aks-blocks-prod",
+            "aks-blocks-nonprod"
+          ],
           "stg": [
             "aks-blocks-stg",
             "aks-blocks-stg-nonprod"
