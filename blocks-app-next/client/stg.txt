@@ -22,3 +22,4 @@ blocksos/blocks-app-next-client:5998a82-2643-26.03.93
 blocksos/blocks-app-next-client:fa7b0b6-2654-26.03.94
 blocksos/blocks-app-next-client:0ad2210-2654-26.03.96
 blocksos/blocks-app-next-client:504b5c4-2654-26.03.97
+blocksos/blocks-app-next-client:504b5c4-2654-26.03.98
