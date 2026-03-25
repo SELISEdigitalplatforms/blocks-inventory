@@ -2,3 +2,4 @@ blocksos/blocks-app-next-client:148ea84--26.03.88
 blocksos/blocks-app-next-client:6aa5a18-2643-26.03.89
 blocksos/blocks-app-next-client:fa7b0b6-2654-26.03.94
 blocksos/blocks-app-next-client:75f3fd6-24-26.03.101
+blocksos/blocks-app-next-client:a84ed5b-24-26.03.112
