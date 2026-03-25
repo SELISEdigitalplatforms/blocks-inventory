@@ -27,3 +27,4 @@ blocksos/blocks-app-next-client:bb3a247-2654-26.03.99
 blocksos/blocks-app-next-client:75f3fd6-24-26.03.101
 blocksos/blocks-app-next-client:8e54b8a-24-26.03.107
 blocksos/blocks-app-next-client:a84ed5b-24-26.03.112
+blocksos/blocks-app-next-client:172dcc3-24-26.03.113
