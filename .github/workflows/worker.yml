@@ -114,7 +114,7 @@ jobs:
 
           echo "image_digest_ref=${IMAGE_DIGEST_REF}" >> $GITHUB_ENV
 
-      - name: Generate SBOM (syft, fallback to trivy)
+      - name: Generate SBOM
         run: |
           SBOM_FILE="sbom-worker.json"
           SYFT_OK=0
@@ -122,7 +122,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD:/work" \
             -w /work \
-            anchore/syft:latest "${image_digest_ref}" -o cyclonedx-json > "${SBOM_FILE}" || SYFT_OK=$?
+            anchore/syft:v1.42.3 "${image_digest_ref}" -o cyclonedx-json > "${SBOM_FILE}" || SYFT_OK=$?
 
           if [ "${SYFT_OK}" -ne 0 ]; then
             docker system prune -af
@@ -132,7 +132,7 @@ jobs:
               -v /var/run/docker.sock:/var/run/docker.sock \
               -v "$PWD:/work" \
               -w /work \
-              aquasec/trivy:latest image --format cyclonedx --output "${SBOM_FILE}" "${image_digest_ref}"
+              anchore/syft:v1.42.3 "${image_digest_ref}" -o cyclonedx-json > "${SBOM_FILE}"
           fi
 
           if [ ! -s "${SBOM_FILE}" ]; then
