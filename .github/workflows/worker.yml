@@ -132,7 +132,7 @@ jobs:
               -v /var/run/docker.sock:/var/run/docker.sock \
               -v "$PWD:/work" \
               -w /work \
-              anchore/syft:v1.42.3 "${image_digest_ref}" -o cyclonedx-json > "${SBOM_FILE}"
+              aquasec/trivy:0.69.3 image --format cyclonedx --output "${SBOM_FILE}" "${image_digest_ref}"
           fi
 
           if [ ! -s "${SBOM_FILE}" ]; then
