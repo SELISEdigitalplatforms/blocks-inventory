@@ -29,3 +29,4 @@ blocksos/blocks-app-next-client:8e54b8a-24-26.03.107
 blocksos/blocks-app-next-client:a84ed5b-24-26.03.112
 blocksos/blocks-app-next-client:172dcc3-24-26.03.113
 blocksos/blocks-app-next-client:c6380d4-24-26.03.120
+blocksos/blocks-app-next-client:717f462-24-26.03.121
