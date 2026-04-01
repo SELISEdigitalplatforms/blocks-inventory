@@ -151,6 +151,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         shell: bash
         run: |
+          echo "SonarQube Host: ${{ inputs.SONARQUBE_HOST }}"
           dotnet-sonarscanner begin \
               /k:"${{ inputs.SONAR_PROJECT_KEY }}" \
               /o:"${{ inputs.SONAR_ORGANIZATION }}" \
