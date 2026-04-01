@@ -1,0 +1,413 @@
+name: Reusable - SAST Python Analysis
+
+on:
+  workflow_call:
+    inputs:
+      # General Configuration
+      PYTHON_VERSION:
+        required: false
+        type: string
+        default: "3.11"
+        description: "Python version to install (e.g., '3.9', '3.10', '3.11', '3.12')"
+
+      # Package Manager Configuration
+      PACKAGE_MANAGER:
+        description: "Package manager to use (pip, poetry, pipenv, uv). If empty, auto-detects based on project files"
+        required: false
+        type: string
+        default: ""
+
+      # SonarQube Configuration
+      SONARQUBE_HOST:
+        required: true
+        type: string
+        description: "SonarQube host URL"
+      SONAR_PROJECT_KEY:
+        required: true
+        type: string
+        description: "SonarQube project key"
+      SONAR_ORGANIZATION:
+        required: true
+        type: string
+        description: "SonarQube organization key"
+
+      WORKING_DIRECTORY:
+        required: false
+        type: string
+        description: "The working directory where the project is located"
+        default: "."
+
+      HAS_SUBMODULES:
+        description: "Set to true if repository uses Git submodules"
+        required: false
+        type: boolean
+        default: false
+
+      SKIP_QUALITY_GATE:
+        required: false
+        type: boolean
+        description: "Skip the SonarQube Quality Gate check"
+        default: false
+
+      # Python Configuration
+      REQUIREMENTS_FILE:
+        description: "Custom requirements file path (default: requirements.txt)"
+        required: false
+        type: string
+        default: "requirements.txt"
+
+      SKIP_TESTS:
+        description: "Skip running tests (default: false)"
+        required: false
+        type: boolean
+        default: false
+
+    secrets:
+      SONAR_TOKEN:
+        required: true
+        description: "A SonarQube token with analysis permissions"
+      SELISE_GITHUB_PAT:
+        required: false
+        description: "GitHub PAT for private repositories and submodules"
+
+jobs:
+  sonarqube-python-analysis:
+    name: SonarQube Python Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for accurate SonarQube analysis
+          submodules: ${{ inputs.HAS_SUBMODULES && 'recursive' || 'false' }}
+          token: ${{ secrets.SELISE_GITHUB_PAT || github.token }}
+
+      - name: Update submodules
+        if: inputs.HAS_SUBMODULES
+        run: |
+          git submodule update --init --recursive
+          echo "✅ Submodules updated" >> $GITHUB_STEP_SUMMARY
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.PYTHON_VERSION }}
+
+      - name: Determine package manager
+        id: config
+        working-directory: ${{ inputs.WORKING_DIRECTORY }}
+        run: |
+          # Determine package manager
+          if [ -n "${{ inputs.PACKAGE_MANAGER }}" ]; then
+            PACKAGE_MANAGER="${{ inputs.PACKAGE_MANAGER }}"
+          else
+            # Auto-detect package manager
+            if [ -f "uv.lock" ]; then
+              PACKAGE_MANAGER="uv"
+            elif [ -f "pyproject.toml" ]; then
+              if grep -q "tool.poetry" pyproject.toml; then
+                PACKAGE_MANAGER="poetry"
+              elif grep -q "tool.uv" pyproject.toml || grep -q "\[tool.uv\]" pyproject.toml; then
+                PACKAGE_MANAGER="uv"
+              else
+                PACKAGE_MANAGER="pip"
+              fi
+            elif [ -f "Pipfile" ]; then
+              PACKAGE_MANAGER="pipenv"
+            elif [ -f "${{ inputs.REQUIREMENTS_FILE }}" ]; then
+              PACKAGE_MANAGER="pip"
+            else
+              echo "❌ No Python package manager configuration found" >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          fi
+          echo "package_manager=$PACKAGE_MANAGER" >> $GITHUB_OUTPUT
+
+          echo "### 🔍 SonarQube Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package Manager**: $PACKAGE_MANAGER" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python Version**: ${{ inputs.PYTHON_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Working Directory**: ${{ inputs.WORKING_DIRECTORY }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: |
+            ${{ runner.os }}-sonar
+
+      - name: Cache pip dependencies
+        if: steps.config.outputs.package_manager == 'pip'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Cache poetry dependencies
+        if: steps.config.outputs.package_manager == 'poetry'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pypoetry
+            ~/.virtualenvs
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Cache pipenv dependencies
+        if: steps.config.outputs.package_manager == 'pipenv'
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/virtualenvs
+          key: ${{ runner.os }}-pipenv-${{ hashFiles('**/Pipfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pipenv-
+
+      - name: Cache uv dependencies
+        if: steps.config.outputs.package_manager == 'uv'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/uv.lock', '**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
+
+      - name: Install dependencies and run tests
+        working-directory: ${{ inputs.WORKING_DIRECTORY }}
+        env:
+          PACKAGE_MANAGER: ${{ steps.config.outputs.package_manager }}
+        run: |
+          echo "📦 Installing dependencies with $PACKAGE_MANAGER..."
+
+          case "$PACKAGE_MANAGER" in
+            "pip")
+              python -m pip install --upgrade pip
+              if [ -f "${{ inputs.REQUIREMENTS_FILE }}" ]; then
+                pip install -r ${{ inputs.REQUIREMENTS_FILE }}
+              fi
+              pip install pytest pytest-cov
+              ;;
+            "poetry")
+              pip install poetry
+              poetry install
+              poetry add --group dev pytest pytest-cov
+              ;;
+            "pipenv")
+              pip install pipenv
+              pipenv install --dev
+              pipenv install pytest pytest-cov
+              ;;
+            "uv")
+              # Install uv
+              curl -LsSf https://astral.sh/uv/install.sh | sh
+              export PATH="$HOME/.cargo/bin:$PATH"
+              # Sync dependencies
+              uv sync
+              # Install test dependencies
+              uv pip install pytest pytest-cov
+              ;;
+          esac
+
+          echo "✅ Dependencies installed" >> $GITHUB_STEP_SUMMARY
+
+          # Run tests with coverage (if not skipped)
+          if [ "${{ inputs.SKIP_TESTS }}" != "true" ]; then
+            echo "🧪 Running tests with coverage..."
+            
+            case "$PACKAGE_MANAGER" in
+              "uv")
+                uv run pytest --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
+                ;;
+              "poetry")
+                poetry run pytest --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
+                ;;
+              "pipenv")
+                pipenv run pytest --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
+                ;;
+              *)
+                pytest --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
+                ;;
+            esac
+            
+            echo "✅ Tests completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ Tests skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ inputs.SONARQUBE_HOST }}
+        with:
+          projectBaseDir: ${{ inputs.WORKING_DIRECTORY }}
+          args: >
+            -Dsonar.projectKey=${{ inputs.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ inputs.SONAR_ORGANIZATION }}
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/tests/**,**/__pycache__/**,**/venv/**,**/.venv/**,**/.pytest_cache/**,**/dist/**,**/build/**,**/*.egg-info/**
+
+      - name: Find and upload SonarQube report
+        if: always()
+        shell: bash
+        run: |
+          # Find report-task.txt anywhere in the workspace
+          REPORT_FILE=$(find ${{ inputs.WORKING_DIRECTORY }} -name "report-task.txt" -type f 2>/dev/null | head -n 1)
+
+          if [ -z "$REPORT_FILE" ]; then
+            echo "⚠️ Warning: report-task.txt not found" >> $GITHUB_STEP_SUMMARY
+            mkdir -p ./sonar-report
+            echo "no-report-found" > ./sonar-report/.placeholder
+          else
+            echo "✅ Found report at: $REPORT_FILE" >> $GITHUB_STEP_SUMMARY
+            mkdir -p ./sonar-report
+            cp "$REPORT_FILE" ./sonar-report/
+          fi
+
+      - name: Upload SonarQube report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-report
+          path: ./sonar-report/
+
+      - name: Fetch SonarQube metrics
+        if: always()
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          SONAR_BASE="${{ inputs.SONARQUBE_HOST }}"
+          SONAR_BASE="${SONAR_BASE%/}"
+          REPORT_TASK=$(find ${{ inputs.WORKING_DIRECTORY }} -name "report-task.txt" -type f 2>/dev/null | head -n 1)
+
+          if [ -n "$REPORT_TASK" ]; then
+            CE_TASK_URL=$(awk -F= '/ceTaskUrl/ {print $2}' "$REPORT_TASK" | tr -d '\r')
+            echo "Waiting for SonarQube task: $CE_TASK_URL"
+
+            for i in {1..10}; do
+              TASK_STATUS=$(curl -sS -u "${SONAR_TOKEN}:" "$CE_TASK_URL" | jq -r '.task.status')
+              echo "Task status: $TASK_STATUS"
+              if [ "$TASK_STATUS" = "SUCCESS" ]; then
+                sleep 5
+                break
+              fi
+              sleep 10
+            done
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            QUERY_PARAM="pullRequest=${{ github.event.pull_request.number }}"
+          else
+            QUERY_PARAM="branch=${GITHUB_REF_NAME}"
+          fi
+
+          METRICS="duplicated_lines_density,duplicated_lines,duplicated_blocks,security_hotspots,security_hotspots_reviewed,security_review_rating,vulnerabilities"
+          URL="${SONAR_BASE}/api/measures/component?component=${{ inputs.SONAR_PROJECT_KEY }}&metricKeys=${METRICS}&${QUERY_PARAM}"
+
+          echo "Fetching metrics from: $URL"
+          RESPONSE=$(curl -sS -u "${SONAR_TOKEN}:" "$URL")
+          echo "$RESPONSE" > sonar-metrics.json
+          echo "Sonar Response: $RESPONSE"
+
+      - name: SAST Summary
+        if: always()
+        shell: bash
+        run: |
+          METRICS_FILE="sonar-metrics.json"
+
+          get_metric() {
+            if [ -f "$METRICS_FILE" ]; then
+              val=$(jq -r --arg k "$1" '.component.measures[] | select(.metric==$k) | .value' "$METRICS_FILE" 2>/dev/null)
+              echo "${val:-n/a}"
+            else
+              echo "n/a"
+            fi
+          }
+
+          DUP_DENSITY=$(get_metric duplicated_lines_density)
+          DUP_LINES=$(get_metric duplicated_lines)
+          DUP_BLOCKS=$(get_metric duplicated_blocks)
+          HOTSPOTS=$(get_metric security_hotspots)
+          HOTSPOTS_REVIEWED=$(get_metric security_hotspots_reviewed)
+          HOTSPOT_RATING=$(get_metric security_review_rating)
+          VULNS=$(get_metric vulnerabilities)
+
+          {
+            echo "### SAST (SonarQube) Summary"
+            echo ""
+            echo "| Metric | Value |"
+            echo "| --- | --- |"
+            echo "| **Quality Gate** | \`${{ inputs.SKIP_QUALITY_GATE && 'skipped' || 'see quality gate job' }}\` |"
+            echo "| **Vulnerabilities** | \`${VULNS}\` |"
+            echo "| **Security Hotspots** | \`${HOTSPOTS}\` |"
+            echo "| **Duplication Density** | \`${DUP_DENSITY} %\` |"
+            echo "| **Duplicated Lines** | \`${DUP_LINES}\` (Blocks: \`${DUP_BLOCKS}\`) |"
+            echo ""
+            echo "Detailed report available at [SonarQube Portal](${{ inputs.SONARQUBE_HOST }}/dashboard?id=${{ inputs.SONAR_PROJECT_KEY }})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  sonarqube-quality-gate:
+    name: SonarQube Quality Gate Check
+    runs-on: ubuntu-latest
+    needs: sonarqube-python-analysis
+    if: ${{ !inputs.SKIP_QUALITY_GATE }}
+    permissions:
+      contents: read
+    steps:
+      - name: Download SonarQube report
+        uses: actions/download-artifact@v4
+        with:
+          name: sonar-report
+          path: ./sonar-report/
+
+      - name: Find report-task.txt
+        id: find-report
+        run: |
+          REPORT_FILE=$(find ./sonar-report -name "report-task.txt" | head -n 1)
+          if [ -z "$REPORT_FILE" ]; then
+            echo "❌ report-task.txt not found"
+            exit 1
+          fi
+          echo "report_file=$REPORT_FILE" >> $GITHUB_OUTPUT
+          echo "Found report at: $REPORT_FILE"
+
+      - name: SonarQube Quality Gate Check
+        id: quality-gate
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ inputs.SONARQUBE_HOST }}
+        with:
+          scanMetadataReportFile: ${{ steps.find-report.outputs.report_file }}
+
+      - name: Quality Gate Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## 🎯 Quality Gate Result" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.quality-gate.outcome }}" == "success" ]; then
+            echo "### ✅ Quality Gate Passed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All quality criteria met! Your code meets the required standards." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Quality Gate Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Quality gate conditions not met. Please review the issues in SonarQube." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**View Details**: [${{ inputs.SONARQUBE_HOST }}/dashboard?id=${{ inputs.SONAR_PROJECT_KEY }}](${{ inputs.SONARQUBE_HOST }}/dashboard?id=${{ inputs.SONAR_PROJECT_KEY }})" >> $GITHUB_STEP_SUMMARY
