@@ -1,2 +1,3 @@
 blocksos/blocks-ai-py-worker:2c2328f-176-26.03.15
 blocksos/blocks-ai-py-worker:bd830bb-178-26.03.18
+blocksos/blocks-ai-py-worker:eac3497-101-26.04.1
