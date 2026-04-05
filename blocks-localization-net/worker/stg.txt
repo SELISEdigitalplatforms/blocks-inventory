@@ -9,3 +9,4 @@ blocksos/blocks-localization-net-worker:3437820--26.02.58
 blocksos/blocks-localization-net-worker:3437820--26.02.59
 blocksos/blocks-localization-net-worker:4cbe8ff-128-26.02.61
 blocksos/blocks-localization-net-worker:4012e4a-131-26.02.65
+blocksos/blocks-localization-net-worker:f2c196f--26.04.6
