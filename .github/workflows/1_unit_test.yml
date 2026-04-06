@@ -33,6 +33,11 @@ jobs:
         with:
           dotnet-version: '9.0.x'
       
+      - name: Install Native Dependencies
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y libfontconfig1 libfreetype6 libpng16-16 libexpat1 libharfbuzz0b libicu70 libjpeg-turbo8
+            
       - name: Run Tests
         working-directory: ./src
         shell: pwsh
