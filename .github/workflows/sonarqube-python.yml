@@ -93,7 +93,7 @@ jobs:
           echo "✅ Submodules updated" >> $GITHUB_STEP_SUMMARY
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.PYTHON_VERSION }}
 
