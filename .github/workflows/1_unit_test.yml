@@ -27,6 +27,11 @@ jobs:
         uses: ./.github/actions/setvars
         with:
           varFilePath: ./.github/variables/vars.env
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '9.0.x'
       
       - name: Run Tests
         working-directory: ./src
