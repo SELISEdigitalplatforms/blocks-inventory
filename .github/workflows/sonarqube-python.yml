@@ -79,6 +79,8 @@ jobs:
     env:
       PYTEST_ADDOPTS: "-p no:cacheprovider"
       PYTHONMALLOC: "malloc"
+      TORCHDYNAMO_DISABLE: "1"
+      TOKENIZERS_PARALLELISM: "false"
     name: SonarQube Python Analysis
     runs-on: ubuntu-latest
     permissions:
