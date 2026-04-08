@@ -66,6 +66,12 @@ on:
         type: boolean
         default: false
 
+      USE_FORKED_TESTS:
+        description: "Run each test in a forked subprocess to isolate memory (for ML-heavy projects)"
+        required: false
+        type: boolean
+        default: false
+
     secrets:
       SONAR_TOKEN:
         required: true
@@ -221,7 +227,7 @@ jobs:
               # Sync dependencies
               uv sync
               # Install test dependencies
-              uv pip install pytest pytest-cov
+              uv pip install pytest pytest-cov pytest-forked
               ;;
           esac
 
@@ -233,7 +239,8 @@ jobs:
             
             case "$PACKAGE_MANAGER" in
               "uv")
-                uv run pytest -p no:cacheprovider --maxfail=50 --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
+                FORKED_FLAG=${{ inputs.USE_FORKED_TESTS && '"--forked"' || '""' }}
+              uv run pytest $FORKED_FLAG -p no:cacheprovider --maxfail=50 --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
                 ;;
               "poetry")
                 poetry run pytest -p no:cacheprovider --maxfail=50 --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
