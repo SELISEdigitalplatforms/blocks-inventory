@@ -11,3 +11,4 @@ blocksos/blocks-localization-net-worker:4cbe8ff-128-26.02.61
 blocksos/blocks-localization-net-worker:4012e4a-131-26.02.65
 blocksos/blocks-localization-net-worker:f2c196f--26.04.6
 blocksos/blocks-localization-net-worker:c565397-15-26.04.7
+blocksos/blocks-localization-net-worker:883d03e-15-26.04.12
