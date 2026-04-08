@@ -231,16 +231,16 @@ jobs:
             
             case "$PACKAGE_MANAGER" in
               "uv")
-                uv run pytest -p no:cacheprovider --maxfail=20 --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
+                uv run pytest -p no:cacheprovider --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
                 ;;
               "poetry")
-                poetry run pytest -p no:cacheprovider --maxfail=20 --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
+                poetry run pytest -p no:cacheprovider --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
                 ;;
               "pipenv")
-                pipenv run pytest -p no:cacheprovider --maxfail=20 --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
+                pipenv run pytest -p no:cacheprovider --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
                 ;;
               *)
-                pytest -p no:cacheprovider --maxfail=20 --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
+                pytest -p no:cacheprovider --cov=. --cov-report=xml:coverage.xml --cov-report=term || echo "⚠️ Tests failed or no tests found"
                 ;;
             esac
             
