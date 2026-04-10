@@ -2,3 +2,4 @@ blocksos/blocks-lmt-net-api-lmt-client:7e85f76--26.03.3
 blocksos/blocks-lmt-net-api-lmt-client:44154ec-42-26.03.4
 blocksos/blocks-lmt-net-client:59c9f3a-45-26.03.8
 blocksos/blocks-lmt-net-client:8004d57-80-26.03.12
+blocksos/blocks-lmt-net-client:aab0b3a-80-26.04.3
