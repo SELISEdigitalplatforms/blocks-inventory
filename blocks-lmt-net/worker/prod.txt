@@ -1,2 +1,3 @@
 blocksos/blocks-lmt-net-worker:8004d57-80-26.03.12
 blocksos/blocks-lmt-net-worker:aab0b3a-80-26.04.3
+blocksos/blocks-lmt-net-worker:6b7d35a-80-26.04.5
