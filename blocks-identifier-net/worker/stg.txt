@@ -18,3 +18,4 @@ blocksos/blocks-identifier-net-worker:03eabbb--26.03.22
 blocksos/blocks-identifier-net-worker:d2403d2-11-26.03.23
 blocksos/blocks-identifier-net-worker:cbd7c57-11-26.04.3
 blocksos/blocks-identifier-net-worker:cbd7c57-11-26.04.4
+blocksos/blocks-identifier-net-worker:dd0b605-11-26.04.5
