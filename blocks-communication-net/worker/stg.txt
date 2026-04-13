@@ -12,3 +12,4 @@ blocksos/blocks-communication-net-worker:7d652d6-47-26.03.1
 blocksos/blocks-communication-net-worker:b73b855--26.03.4
 blocksos/blocks-communication-net-worker:4357b1a--26.03.7
 blocksos/blocks-communication-net-worker:f794f33-53-26.03.8
+blocksos/blocks-communication-net-worker:ade2d45-56-26.04.1
