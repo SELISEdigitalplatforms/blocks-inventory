@@ -1,1 +1,2 @@
 blocksos/blocks-lmt-net-api:aab0b3a-80-26.04.3
+blocksos/blocks-lmt-net-api:6b7d35a-80-26.04.5
