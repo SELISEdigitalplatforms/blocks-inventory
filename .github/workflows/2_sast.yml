@@ -70,14 +70,14 @@ jobs:
       - name: SonarQube Analysis
         working-directory: ./src
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
         run: |
-          dotnet-sonarscanner begin /k:"${{ env.SONAR_KEY }}" /o:"${{ env.AUTHOR }}" /d:sonar.login=${{ secrets.SONAR_TOKEN }} /d:sonar.host.url="${{ env.SONARQUBE_HOST }}" /d:sonar.cs.opencover.reportsPaths=coverage.xml
+          dotnet-sonarscanner begin /k:"${{ env.SONAR_KEY }}" /o:"${{ env.AUTHOR }}" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="${{ env.SONARQUBE_HOST }}" /d:sonar.cs.opencover.reportsPaths="TestResults/coverage.xml"
           dotnet restore "./${{ env.SOLUTION_NAME }}" -s https://api.nuget.org/v3/index.json -s https://nuget.selise.biz/nuget
           dotnet build "./${{ env.SOLUTION_NAME }}" --no-incremental
-          coverlet ./XUnitTest/bin/Debug/net9.0/XUnitTest.dll --target "dotnet" --targetargs "test ./${{ env.SOLUTION_NAME }} --no-build" -f=opencover -o="coverage.xml"
-          dotnet-sonarscanner end /d:sonar.login=${{ secrets.SONAR_TOKEN }}
+          dotnet test "./${{ env.SOLUTION_NAME }}" --no-build /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput="./TestResults/coverage.xml"
+          dotnet-sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
 
       - name: SonarQube Quality Gate check
         id: quality-gate
