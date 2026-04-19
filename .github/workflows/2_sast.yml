@@ -7,11 +7,6 @@ on:
         required: false
         type: string
         default: '9.0.x'
-      target-framework:
-        description: 'The target framework moniker (e.g., net9.0, net10.0)'
-        required: false
-        type: string
-        default: 'net9.0'
     secrets:
       SONAR_TOKEN:
         required: true
@@ -81,7 +76,7 @@ jobs:
           dotnet-sonarscanner begin /k:"${{ env.SONAR_KEY }}" /o:"${{ env.AUTHOR }}" /d:sonar.login=${{ secrets.SONAR_TOKEN }} /d:sonar.host.url="${{ env.SONARQUBE_HOST }}" /d:sonar.cs.opencover.reportsPaths=coverage.xml
           dotnet restore "./${{ env.SOLUTION_NAME }}" -s https://api.nuget.org/v3/index.json -s https://nuget.selise.biz/nuget
           dotnet build "./${{ env.SOLUTION_NAME }}" --no-incremental
-          coverlet ./XUnitTest/bin/Debug/${{ inputs.target-framework }}/XUnitTest.dll --target "dotnet" --targetargs "test ./${{ env.SOLUTION_NAME }} --no-build" -f=opencover -o="coverage.xml"
+          coverlet ./XUnitTest/bin/Debug/net9.0/XUnitTest.dll --target "dotnet" --targetargs "test ./${{ env.SOLUTION_NAME }} --no-build" -f=opencover -o="coverage.xml"
           dotnet-sonarscanner end /d:sonar.login=${{ secrets.SONAR_TOKEN }}
 
       - name: SonarQube Quality Gate check
