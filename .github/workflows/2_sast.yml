@@ -1,6 +1,12 @@
 name: Analyze Code Quality
 on: 
   workflow_call:
+    inputs:
+      dotnet-version:
+        description: 'The dotnet version to use'
+        required: false
+        type: string
+        default: '9.0.x'
     secrets:
       SONAR_TOKEN:
         required: true
@@ -30,6 +36,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
       
       - name: Cache SonarCloud packages
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
