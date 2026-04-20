@@ -363,7 +363,9 @@
         "cluster": {
           "prod": [
             "aks-blocks-prod",
-            "aks-blocks-nonprod"
+            "aks-blocks-uds-prod",
+            "aks-blocks-nonprod",
+            "aks-blocks-uds-nonprod"
           ],
           "stg": [
             "aks-blocks-stg",
@@ -379,7 +381,9 @@
         "cluster": {
           "prod": [
             "aks-blocks-prod",
-            "aks-blocks-nonprod"
+            "aks-blocks-uds-prod",
+            "aks-blocks-nonprod",
+            "aks-blocks-uds-nonprod"
           ],
           "stg": [
             "aks-blocks-stg",
