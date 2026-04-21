@@ -72,7 +72,8 @@ jobs:
             /o:"${{ env.AUTHOR }}" \
             /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
             /d:sonar.host.url="${{ env.SONARQUBE_HOST }}" \
-            /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml"
+            /d:sonar.projectBaseDir="./" \
+            /d:sonar.cs.cobertura.reportsPaths="**/coverage.cobertura.xml"
 
           dotnet restore "./${{ env.SOLUTION_NAME }}"
 
@@ -80,9 +81,8 @@ jobs:
 
           dotnet test "./${{ env.SOLUTION_NAME }}" \
             --no-build \
-            /p:CollectCoverage=true \
-            /p:CoverletOutputFormat=opencover \
-            /p:CoverletOutput=./TestResults/coverage
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults
 
           dotnet-sonarscanner end \
             /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
@@ -131,9 +131,7 @@ jobs:
 
           URL="${SONAR_BASE}/api/measures/component?component=${SONAR_KEY}&metricKeys=${METRICS}&${QUERY_PARAM}"
 
-          RESPONSE=$(curl -sS -u "${SONAR_GET}:" "$URL")
-
-          echo "$RESPONSE" > sonar-metrics.json
+          curl -sS -u "${SONAR_GET}:" "$URL" > sonar-metrics.json
 
       - name: SAST Summary
         if: always()
