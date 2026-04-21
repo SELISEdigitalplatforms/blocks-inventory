@@ -1,4 +1,5 @@
 name: Analyze Code Quality
+
 on: 
   workflow_call:
     inputs:
@@ -12,10 +13,12 @@ on:
         required: true
       SONAR_GET:
         required: true
+
 permissions:
   contents: read
   checks: write
   pull-requests: read
+
 jobs:
   build:
     name: SonarQube Analysis
@@ -26,7 +29,7 @@ jobs:
         with:
           fetch-depth: 0  
 
-      - name: Set Environment Variables
+      - name: Set environment variables
         uses: ./.github/actions/setvars
         with:
           varFilePath: ./.github/variables/vars.env
@@ -37,52 +40,59 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup dotnet
+      - name: Set up .NET
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
       
-      - name: Cache SonarCloud packages
+      - name: Cache Sonar packages
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
-          path: ~\sonar\cache
+          path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
       
-      - name: Cache SonarCloud scanner
+      - name: Cache Sonar scanner
         id: cache-sonar-scanner
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
-          path: .\.sonar\scanner
+          path: ~/.sonar/scanner
           key: ${{ runner.os }}-sonar-scanner
           restore-keys: ${{ runner.os }}-sonar-scanner
       
-      - name: Install SonarCloud scanner
+      - name: Install Sonar scanner
         if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: |
-          dotnet tool install --global dotnet-sonarscanner
+        run: dotnet tool install --global dotnet-sonarscanner
       
-      - name: Install coverlet
-        run: |
-           dotnet tool install --global coverlet.console --version 6.0.0
-         
-      - name: SonarQube Analysis
+      - name: SonarQube analysis
         working-directory: ./src
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
-        shell: pwsh
         run: |
-          dotnet-sonarscanner begin /k:"${{ env.SONAR_KEY }}" /o:"${{ env.AUTHOR }}" /d:sonar.login=${{ secrets.SONAR_TOKEN }} /d:sonar.host.url="${{ env.SONARQUBE_HOST }}" /d:sonar.cs.opencover.reportsPaths=coverage.xml
-          dotnet restore "./${{ env.SOLUTION_NAME }}" -s https://api.nuget.org/v3/index.json -s https://nuget.selise.biz/nuget
+          dotnet-sonarscanner begin \
+            /k:"${{ env.SONAR_KEY }}" \
+            /o:"${{ env.AUTHOR }}" \
+            /d:sonar.login=${{ secrets.SONAR_TOKEN }} \
+            /d:sonar.host.url="${{ env.SONARQUBE_HOST }}" \
+            /d:sonar.cs.opencover.reportsPaths=**/coverage.cobertura.xml
+
+          dotnet restore "./${{ env.SOLUTION_NAME }}" \
+            -s https://api.nuget.org/v3/index.json \
+            -s https://nuget.selise.biz/nuget
+
           dotnet build "./${{ env.SOLUTION_NAME }}" --no-incremental
-          coverlet ./XUnitTest/bin/Debug/net9.0/XUnitTest.dll --target "dotnet" --targetargs "test ./${{ env.SOLUTION_NAME }} --no-build" -f=opencover -o="coverage.xml"
-          dotnet-sonarscanner end /d:sonar.login=${{ secrets.SONAR_TOKEN }}
+
+          dotnet test "./${{ env.SOLUTION_NAME }}" \
+            --no-build \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults
+
+          dotnet-sonarscanner end \
+            /d:sonar.login=${{ secrets.SONAR_TOKEN }}
 
       - name: SonarQube Quality Gate check
         id: quality-gate
         uses: sonarsource/sonarqube-quality-gate-action@cb3ed20f9fec62b4c3b8ad9e77656c6adaade913 # master
-        # Force to fail step after specific time.
         timeout-minutes: 5
         with:
           scanMetadataReportFile: src/.sonarqube/out/.sonar/report-task.txt
@@ -108,34 +118,31 @@ jobs:
               TASK_STATUS=$(curl -sS -u "${SONAR_GET}:" "$CE_TASK_URL" | jq -r '.task.status')
               echo "Task status: $TASK_STATUS"
               if [ "$TASK_STATUS" = "SUCCESS" ]; then
-                sleep 5 # Give SonarQube a moment to index the results
+                sleep 5
                 break
               fi
               sleep 10
             done
           fi
 
-          # 2. Determine if this is a Pull Request or a Branch
+          # 2. Determine if this is a pull request or a branch
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             QUERY_PARAM="pullRequest=${{ github.event.pull_request.number }}"
           else
             QUERY_PARAM="branch=${GITHUB_REF_NAME}"
           fi
 
-          # 3. Fetch Metrics
+          # 3. Fetch metrics
           METRICS="duplicated_lines_density,duplicated_lines,duplicated_blocks,security_hotspots,security_hotspots_reviewed,security_review_rating,vulnerabilities"
           URL="${SONAR_BASE}/api/measures/component?component=${SONAR_KEY}&metricKeys=${METRICS}&${QUERY_PARAM}"
           
           echo "Fetching metrics from: $URL"
           RESPONSE=$(curl -sS -u "${SONAR_GET}:" "$URL")
           
-          # Save response for the next step
           echo "$RESPONSE" > sonar-metrics.json
-          
-          # Debug: Print response to logs (optional, remove once working)
-          echo "Sonar Response: $RESPONSE"
+          echo "Sonar response: $RESPONSE"
 
-      - name: SAST Summary
+      - name: SAST summary
         if: always()
         shell: bash
         run: |
@@ -143,7 +150,6 @@ jobs:
           
           get_metric() {
             if [ -f "$METRICS_FILE" ]; then
-              # This jq filter handles the nested measures array structure
               val=$(jq -r --arg k "$1" '.component.measures[] | select(.metric==$k) | .value' "$METRICS_FILE" 2>/dev/null)
               echo "${val:-n/a}"
             else
