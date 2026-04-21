@@ -148,7 +148,7 @@ jobs:
           echo "- **Working Directory**: ${{ inputs.WORKING_DIRECTORY }}" >> $GITHUB_STEP_SUMMARY
 
       - name: Cache SonarQube packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
@@ -157,7 +157,7 @@ jobs:
 
       - name: Cache pip dependencies
         if: steps.config.outputs.package_manager == 'pip'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
@@ -166,7 +166,7 @@ jobs:
 
       - name: Cache poetry dependencies
         if: steps.config.outputs.package_manager == 'poetry'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pypoetry
@@ -177,7 +177,7 @@ jobs:
 
       - name: Cache pipenv dependencies
         if: steps.config.outputs.package_manager == 'pipenv'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.local/share/virtualenvs
           key: ${{ runner.os }}-pipenv-${{ hashFiles('**/Pipfile.lock') }}
@@ -186,7 +186,7 @@ jobs:
 
       - name: Cache uv dependencies
         if: steps.config.outputs.package_manager == 'uv'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/uv
