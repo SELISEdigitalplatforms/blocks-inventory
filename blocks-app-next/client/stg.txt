@@ -42,3 +42,4 @@ blocksos/blocks-app-next-client:1ca44fe-2862-26.04.82
 blocksos/blocks-app-next-client:d92fc2f-22-26.04.85
 blocksos/blocks-app-next-client:d6543c5-22-26.04.87
 blocksos/blocks-app-next-client:e97d5e8-2865-26.04.88
+blocksos/blocks-app-next-client:df8f1d1-2866-26.04.88
