@@ -32,3 +32,4 @@ blocksos/blocks-idp-net-worker:b2f6aba--26.04.24
 blocksos/blocks-idp-net-worker:fb3852f--26.04.25
 blocksos/blocks-idp-net-worker:8781b06--26.04.26
 blocksos/blocks-idp-net-worker:882e3bf-21-26.04.27
+blocksos/blocks-idp-net-worker:ac8edb0-21-26.04.29
