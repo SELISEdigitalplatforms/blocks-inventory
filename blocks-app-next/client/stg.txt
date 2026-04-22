@@ -45,3 +45,4 @@ blocksos/blocks-app-next-client:e97d5e8-2865-26.04.88
 blocksos/blocks-app-next-client:df8f1d1-2866-26.04.88
 blocksos/blocks-app-next-client:ce2a1ce-2867-26.04.89
 blocksos/blocks-app-next-client:bd002a3-2869-26.04.95
+blocksos/blocks-app-next-client:b86cf7b-2870-26.04.98
