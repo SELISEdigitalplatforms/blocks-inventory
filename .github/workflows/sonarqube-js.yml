@@ -1,0 +1,368 @@
+name: Reusable - SonarQube JS/TS Analysis
+
+on:
+  workflow_call:
+    inputs:
+      # ========================================
+      # General Configuration
+      # ========================================
+      SERVICE_NAME:
+        description: "Service name (used for project identification)"
+        required: false
+        type: string
+        default: ""
+
+      REPO_NAME:
+        description: "Repository name (defaults to github.event.repository.name)"
+        required: false
+        type: string
+        default: ""
+
+      NODE_VERSION:
+        description: "Node.js version to use"
+        required: false
+        type: string
+        default: "21"
+
+      JAVA_VERSION:
+        description: "Java version for SonarQube scanner"
+        required: false
+        type: string
+        default: "17"
+
+      # ========================================
+      # Package Manager Configuration
+      # ========================================
+      PACKAGE_MANAGER:
+        description: "Package manager to use (npm, yarn, pnpm)"
+        required: false
+        type: string
+        default: "npm"
+
+      INSTALL_COMMAND:
+        description: "Command to install dependencies (e.g., 'ci', 'install --frozen-lockfile')"
+        required: false
+        type: string
+        default: "ci"
+
+      TEST_COMMAND:
+        description: "Command to run tests and generate coverage"
+        required: false
+        type: string
+        default: "test -- --coverage"
+
+      # ========================================
+      # SonarQube Configuration
+      # ========================================
+      SONARQUBE_HOST:
+        description: "SonarQube host URL (e.g., https://sonarqube.example.com)"
+        required: true
+        type: string
+
+      SONAR_PROJECT_KEY:
+        description: "Custom SonarQube project key (auto-generated if not provided)"
+        required: true
+        type: string
+        default: ""
+
+      SONAR_SOURCES:
+        description: "Comma-separated list of source directories"
+        required: false
+        type: string
+        default: "src"
+
+      SONAR_TESTS:
+        description: "Comma-separated list of test directories"
+        required: false
+        type: string
+        default: "src"
+
+      COVERAGE_EXCLUSIONS:
+        description: "Paths to exclude from coverage"
+        required: false
+        type: string
+        default: "**/node_modules/**,**/dist/**,**/build/**,**/*.model.ts,**/*.module.ts"
+        # For Angular projects, consider adding: **/*.model.ts,**/*.module.ts
+
+      # ========================================
+      # Optional Features
+      # ========================================
+      HAS_SUBMODULES:
+        description: "Set to true if repository uses Git submodules"
+        required: false
+        type: boolean
+        default: false
+
+      SKIP_QUALITY_GATE:
+        description: "Skip the SonarQube Quality Gate check"
+        required: false
+        type: boolean
+        default: false
+
+    secrets:
+      SONAR_TOKEN:
+        required: true
+        description: "SonarQube authentication token"
+
+      SELISE_GITHUB_PAT:
+        required: false
+        description: "GitHub PAT for private repositories and submodules"
+
+jobs:
+  sonarqube-analysis:
+    name: SonarQube Code Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    outputs:
+      project_key: ${{ steps.sonar-config.outputs.project_key }}
+      sonar_host: ${{ steps.sonar-config.outputs.sonar_host }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for accurate SonarQube analysis
+          submodules: ${{ inputs.HAS_SUBMODULES && 'recursive' || 'false' }}
+          token: ${{ secrets.SELISE_GITHUB_PAT || github.token }}
+
+      - name: Update submodules
+        if: inputs.HAS_SUBMODULES
+        run: |
+          git submodule update --init --recursive
+          echo "✅ Submodules updated" >> $GITHUB_STEP_SUMMARY
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.NODE_VERSION }}
+          cache: ${{ inputs.PACKAGE_MANAGER }}
+
+      - name: Install dependencies
+        run: |
+          echo "📦 Installing dependencies with ${{ inputs.PACKAGE_MANAGER }}..."
+          ${{ inputs.PACKAGE_MANAGER }} ${{ inputs.INSTALL_COMMAND }}
+
+      - name: Run tests with coverage
+        id: tests
+        run: |
+          echo "🧪 Running tests and generating coverage..."
+          ${{ inputs.PACKAGE_MANAGER }} run ${{ inputs.TEST_COMMAND }}
+        continue-on-error: true
+
+      - name: Correct coverage paths
+        run: |
+          if [ -f "coverage/lcov.info" ]; then
+            # Get repository name
+            REPO_NAME="${{ inputs.REPO_NAME }}"
+            if [ -z "$REPO_NAME" ]; then
+              REPO_NAME="${{ github.event.repository.name }}"
+            fi
+            
+            # Convert absolute paths to relative paths
+            sed -i "s|/home/runner/work/$REPO_NAME/$REPO_NAME/||g" coverage/lcov.info
+            sed -i "s|$(pwd)/||g" coverage/lcov.info
+            
+            echo "✅ Coverage paths corrected" >> $GITHUB_STEP_SUMMARY
+            echo "- **Coverage file**: coverage/lcov.info" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No coverage/lcov.info file found. Tests may not have generated coverage." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.JAVA_VERSION }}
+          distribution: "temurin"
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar-${{ hashFiles('**/package-lock.json', '**/yarn.lock', '**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-sonar-
+
+      - name: Determine SonarQube configuration
+        id: sonar-config
+        run: |
+          # Determine project key
+          if [ -n "${{ inputs.SONAR_PROJECT_KEY }}" ]; then
+            PROJECT_KEY="${{ inputs.SONAR_PROJECT_KEY }}"
+          else
+            # Auto-generate from repository name
+            PROJECT_KEY="${{ github.repository }}"
+            PROJECT_KEY="${PROJECT_KEY//\//_}"  # Replace / with _
+          fi
+
+          echo "project_key=$PROJECT_KEY" >> $GITHUB_OUTPUT
+
+          # Set SonarQube host
+          SONAR_HOST="${{ inputs.SONARQUBE_HOST }}"
+          echo "sonar_host=$SONAR_HOST" >> $GITHUB_OUTPUT
+
+          # Summary
+          echo "### 🔍 SonarQube Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project Key**: \`$PROJECT_KEY\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Host**: \`$SONAR_HOST\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service**: ${{ inputs.SERVICE_NAME || github.event.repository.name }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: SonarQube scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ steps.sonar-config.outputs.sonar_host }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ steps.sonar-config.outputs.project_key }}
+            -Dsonar.sources=${{ inputs.SONAR_SOURCES }}
+            -Dsonar.tests=${{ inputs.SONAR_TESTS }}
+            -Dsonar.test.inclusions=**/*.test.js,**/*.spec.js,**/*.test.jsx,**/*.spec.jsx,**/*.test.ts,**/*.spec.ts,**/*.test.tsx,**/*.spec.tsx
+            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**
+            -Dsonar.coverage.exclusions=${{ inputs.COVERAGE_EXCLUSIONS }}
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info
+
+      - name: Upload SonarQube report
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonar-report
+          path: .scannerwork/report-task.txt
+          retention-days: 1
+
+      - name: Fetch SonarQube metrics
+        if: always()
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          SONAR_BASE="${{ steps.sonar-config.outputs.sonar_host }}"
+          SONAR_BASE="${SONAR_BASE%/}"
+          REPORT_TASK=$(find . -name "report-task.txt" -type f 2>/dev/null | head -n 1)
+
+          if [ -n "$REPORT_TASK" ]; then
+            CE_TASK_URL=$(awk -F= '/ceTaskUrl/ {print $2}' "$REPORT_TASK" | tr -d '\r')
+            echo "Waiting for SonarQube task: $CE_TASK_URL"
+
+            for i in {1..10}; do
+              TASK_STATUS=$(curl -sS -u "${SONAR_TOKEN}:" "$CE_TASK_URL" | jq -r '.task.status')
+              echo "Task status: $TASK_STATUS"
+              if [ "$TASK_STATUS" = "SUCCESS" ]; then
+                sleep 5
+                break
+              fi
+              sleep 10
+            done
+          fi
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            QUERY_PARAM="pullRequest=${{ github.event.pull_request.number }}"
+          else
+            QUERY_PARAM="branch=${GITHUB_REF_NAME}"
+          fi
+
+          METRICS="duplicated_lines_density,duplicated_lines,duplicated_blocks,security_hotspots,security_hotspots_reviewed,security_review_rating,vulnerabilities"
+          URL="${SONAR_BASE}/api/measures/component?component=${{ steps.sonar-config.outputs.project_key }}&metricKeys=${METRICS}&${QUERY_PARAM}"
+
+          echo "Fetching metrics from: $URL"
+          RESPONSE=$(curl -sS -u "${SONAR_TOKEN}:" "$URL")
+          echo "$RESPONSE" > sonar-metrics.json
+          echo "Sonar Response: $RESPONSE"
+
+      - name: SAST Summary
+        if: always()
+        shell: bash
+        run: |
+          METRICS_FILE="sonar-metrics.json"
+
+          get_metric() {
+            if [ -f "$METRICS_FILE" ]; then
+              val=$(jq -r --arg k "$1" '.component.measures[] | select(.metric==$k) | .value' "$METRICS_FILE" 2>/dev/null)
+              echo "${val:-n/a}"
+            else
+              echo "n/a"
+            fi
+          }
+
+          DUP_DENSITY=$(get_metric duplicated_lines_density)
+          DUP_LINES=$(get_metric duplicated_lines)
+          DUP_BLOCKS=$(get_metric duplicated_blocks)
+          HOTSPOTS=$(get_metric security_hotspots)
+          HOTSPOTS_REVIEWED=$(get_metric security_hotspots_reviewed)
+          HOTSPOT_RATING=$(get_metric security_review_rating)
+          VULNS=$(get_metric vulnerabilities)
+
+          {
+            echo "### SAST (SonarQube) Summary"
+            echo ""
+            echo "| Metric | Value |"
+            echo "| --- | --- |"
+            echo "| **Quality Gate** | \`${{ inputs.SKIP_QUALITY_GATE && 'skipped' || 'see quality gate job' }}\` |"
+            echo "| **Vulnerabilities** | \`${VULNS}\` |"
+            echo "| **Security Hotspots** | \`${HOTSPOTS}\` |"
+            echo "| **Duplication Density** | \`${DUP_DENSITY} %\` |"
+            echo "| **Duplicated Lines** | \`${DUP_LINES}\` (Blocks: \`${DUP_BLOCKS}\`) |"
+            echo ""
+            echo "Detailed report available at [SonarQube Portal](${{ steps.sonar-config.outputs.sonar_host }}/dashboard?id=${{ steps.sonar-config.outputs.project_key }})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Analysis summary
+        if: always()
+        run: |
+          echo "## 📊 SonarQube Analysis Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service**: ${{ inputs.SERVICE_NAME || github.event.repository.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project Key**: \`${{ steps.sonar-config.outputs.project_key }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Node Version**: ${{ inputs.NODE_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Package Manager**: ${{ inputs.PACKAGE_MANAGER }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dashboard**: [${{ steps.sonar-config.outputs.sonar_host }}/dashboard?id=${{ steps.sonar-config.outputs.project_key }}](${{ steps.sonar-config.outputs.sonar_host }}/dashboard?id=${{ steps.sonar-config.outputs.project_key }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Quality Gate**: ${{ inputs.SKIP_QUALITY_GATE && '⏭️ Skipped' || '⏳ Will be checked in next job' }}" >> $GITHUB_STEP_SUMMARY
+
+  sonarqube-quality-gate:
+    name: SonarQube Quality Gate Check
+    runs-on: ubuntu-latest
+    needs: sonarqube-analysis
+    if: ${{ !inputs.SKIP_QUALITY_GATE }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Download SonarQube report
+        uses: actions/download-artifact@v4
+        with:
+          name: sonar-report
+          path: ./sonar-report/
+
+      - name: SonarQube Quality Gate check
+        id: quality-gate
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ needs.sonarqube-analysis.outputs.sonar_host }}
+        with:
+          scanMetadataReportFile: ./sonar-report/report-task.txt
+
+      - name: Quality Gate summary
+        if: always()
+        run: |
+          echo "## 🎯 Quality Gate Result" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.quality-gate.outcome }}" == "success" ]; then
+            echo "### ✅ Quality Gate Passed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All quality criteria met! Your code meets the required standards." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Quality Gate Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Quality gate conditions not met. Please review the issues in SonarQube." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**View Details**: [${{ needs.sonarqube-analysis.outputs.sonar_host }}/dashboard?id=${{ needs.sonarqube-analysis.outputs.project_key }}](${{ needs.sonarqube-analysis.outputs.sonar_host }}/dashboard?id=${{ needs.sonarqube-analysis.outputs.project_key }})" >> $GITHUB_STEP_SUMMARY
