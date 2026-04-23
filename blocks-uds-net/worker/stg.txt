@@ -17,3 +17,4 @@ blocksos/blocks-uds-net-worker:6722be0-172-26.04.27
 blocksos/blocks-uds-net-worker:910297c-175-26.04.30
 blocksos/blocks-uds-net-worker:750e5aa-176-26.04.31
 blocksos/blocks-uds-net-worker:189d4cd-177-26.04.32
+blocksos/blocks-uds-net-worker:3a49e38-179-26.04.34
