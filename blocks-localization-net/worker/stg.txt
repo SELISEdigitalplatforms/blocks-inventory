@@ -16,3 +16,4 @@ blocksos/blocks-localization-net-worker:ffd48c1-161-26.04.21
 blocksos/blocks-localization-net-worker:2614f4f-161-26.04.28
 blocksos/blocks-localization-net-worker:4aec5a3-161-26.04.34
 blocksos/blocks-localization-net-worker:9abea82-161-26.04.36
+blocksos/blocks-localization-net-worker:9abea82-161-26.04.37
