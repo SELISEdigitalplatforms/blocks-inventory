@@ -1,1 +1,2 @@
 blocksos/blocks-ai-py-api:68d89f7-69-26.03.9
+blocksos/blocks-ai-py-api:1a87979--26.04.40
