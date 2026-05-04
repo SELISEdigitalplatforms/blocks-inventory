@@ -1,1 +1,2 @@
 blocksos/blocks-lmt-net-client:aab0b3a-80-26.04.3
+blocksos/blocks-lmt-net-client:9ca2a93-05-26.05.8
