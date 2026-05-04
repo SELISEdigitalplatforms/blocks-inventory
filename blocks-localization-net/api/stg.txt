@@ -19,3 +19,4 @@ blocksos/blocks-localization-net-api:4aec5a3-161-26.04.34
 blocksos/blocks-localization-net-api:9abea82-161-26.04.36
 blocksos/blocks-localization-net-api:9abea82-161-26.04.37
 blocksos/blocks-localization-net-api:edef110-28-26.04.38
+blocksos/blocks-localization-net-api:d8d84ab-28-26.05.1
