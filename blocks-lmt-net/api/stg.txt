@@ -8,3 +8,4 @@ blocksos/blocks-lmt-net-api:1eee4d7--26.05.3
 blocksos/blocks-lmt-net-api:c23dd7e--26.05.4
 blocksos/blocks-lmt-net-api:4c8c589--26.05.5
 blocksos/blocks-lmt-net-api:13c86b1--26.05.6
+blocksos/blocks-lmt-net-api:802c7aa--26.05.7
