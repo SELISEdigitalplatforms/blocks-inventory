@@ -5,3 +5,4 @@ blocksos/blocks-lmt-net-client:8004d57-80-26.03.12
 blocksos/blocks-lmt-net-client:aab0b3a-80-26.04.3
 blocksos/blocks-lmt-net-client:1eee4d7--26.05.3
 blocksos/blocks-lmt-net-client:c23dd7e-80-26.05.4
+blocksos/blocks-lmt-net-client:4c8c589--26.05.5
