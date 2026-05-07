@@ -10,3 +10,4 @@ blocksos/blocks-lmt-net-client:13c86b1-04-26.05.6
 blocksos/blocks-lmt-net-client:802c7aa--26.05.7
 blocksos/blocks-lmt-net-client:9ca2a93-05-26.05.8
 blocksos/blocks-lmt-net-client:662be48-05-26.05.9
+blocksos/blocks-lmt-net-client:7740990-07-26.05.10
