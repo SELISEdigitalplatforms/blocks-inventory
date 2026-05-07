@@ -11,3 +11,4 @@ blocksos/blocks-lmt-net-api:13c86b1--26.05.6
 blocksos/blocks-lmt-net-api:802c7aa--26.05.7
 blocksos/blocks-lmt-net-api:9ca2a93-05-26.05.8
 blocksos/blocks-lmt-net-api:662be48-05-26.05.9
+blocksos/blocks-lmt-net-api:7740990-07-26.05.10
