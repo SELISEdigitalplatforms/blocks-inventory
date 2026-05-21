@@ -13,3 +13,4 @@ blocksos/blocks-ai-py-api:5ce7f14--26.04.38
 blocksos/blocks-ai-py-api:5ce7f14--26.04.39
 blocksos/blocks-ai-py-api:1a87979--26.04.40
 blocksos/blocks-ai-py-api:f7aa1d6-220-26.05.3
+blocksos/blocks-ai-py-api:24ac55a-220-26.05.5
