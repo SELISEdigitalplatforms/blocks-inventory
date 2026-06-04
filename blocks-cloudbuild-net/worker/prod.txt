@@ -1,2 +1,3 @@
 blocksos/blocks-cloudbuild-net-worker:61f7aab-302-26.04.2
 blocksos/blocks-cloudbuild-net-worker:4386126-302-26.05.2
+blocksos/blocks-cloudbuild-net-worker:fee7804-302-26.06.1
