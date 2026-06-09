@@ -40,3 +40,4 @@ blocksos/blocks-idp-net-worker:066a127-158-26.06.3
 blocksos/blocks-idp-net-worker:0dea798-159-26.06.4
 blocksos/blocks-idp-net-worker:485e420-159-26.06.6
 blocksos/blocks-idp-net-worker:b8dc5af-159-26.06.7
+blocksos/blocks-idp-net-worker:2f7f054-164-26.06.9
