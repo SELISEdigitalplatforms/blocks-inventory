@@ -10,3 +10,4 @@ blocksos/blocks-idp-net-api:9d4d647-130-26.04.15
 blocksos/blocks-idp-net-api:ef77ea7-131-26.04.16
 blocksos/blocks-idp-net-api:f36b115-145-26.04.31
 blocksos/blocks-idp-net-api:066a127-158-26.06.3
+blocksos/blocks-idp-net-api:2f7f054-164-26.06.9
