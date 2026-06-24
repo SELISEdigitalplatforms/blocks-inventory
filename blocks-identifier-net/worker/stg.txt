@@ -22,3 +22,4 @@ blocksos/blocks-identifier-net-worker:dd0b605-11-26.04.5
 blocksos/blocks-identifier-net-worker:8d206ad-117-26.04.6
 blocksos/blocks-identifier-net-worker:99cf06b-117-26.04.10
 blocksos/blocks-identifier-net-worker:91516b9-124-26.06.1
+blocksos/blocks-identifier-net-worker:f027cae-125-26.06.2
