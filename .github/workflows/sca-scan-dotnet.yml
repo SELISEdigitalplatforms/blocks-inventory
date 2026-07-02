@@ -401,6 +401,7 @@ jobs:
           cdxgen \
             -o ${{ inputs.SBOM_FILENAME }} \
             -t dotnet \
+            --spec-version 1.6 \
             --deep \
             $FORMULATION_FLAG \
             .
