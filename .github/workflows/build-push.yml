@@ -67,9 +67,6 @@ on:
       semantic_tag:
         description: "Semantic tag"
         value: ${{ jobs.build-and-push.outputs.semantic_tag }}
-      full_image:
-        description: "Full image reference (registry/container:tag)"
-        value: ${{ jobs.build-and-push.outputs.full_image }}
 
 jobs:
   build-and-push:
@@ -83,7 +80,6 @@ jobs:
       container_name: ${{ steps.generate-tag.outputs.container_name }}
       commit_tag: ${{ steps.generate-tag.outputs.commit_tag }}
       semantic_tag: ${{ steps.generate-tag.outputs.semantic_tag }}
-      full_image: ${{ steps.generate-tag.outputs.full_path }}
 
     steps:
       - name: Checkout code
@@ -165,6 +161,7 @@ jobs:
           echo "semantic_tag=${SEMANTIC_TAG}" >> $GITHUB_OUTPUT
           echo "commit_tag=${COMMIT_TAG}" >> $GITHUB_OUTPUT
           echo "container_name=${CONTAINER_NAME}" >> $GITHUB_OUTPUT
+          echo "registry=${REGISTRY}" >> $GITHUB_OUTPUT
           echo "full_path=${FULL_PATH}" >> $GITHUB_OUTPUT
           echo "semantic_full_path=${SEMANTIC_FULL_PATH}" >> $GITHUB_OUTPUT
           echo "use_semantic_tag=${USE_SEMANTIC_TAG}" >> $GITHUB_OUTPUT
@@ -195,9 +192,19 @@ jobs:
         id: build-args
         env:
           BUILD_SECRET_ARGS: ${{ secrets.BUILD_SECRET_ARGS }}
+          REGISTRY: ${{ steps.generate-tag.outputs.registry }}
         run: |
           FORMATTED_ARGS=""
           FORMATTED_SECRET_ARGS=""
+
+          # {{REGISTRY}} is a placeholder callers can use in BUILD_ARGS/BUILD_SECRET_ARGS
+          # to reference this job's own registry host (e.g. for a build-arg pointing at
+          # another image in the same registry) without ever passing the registry secret
+          # itself through job outputs or `with:` (both cross a boundary where GitHub
+          # Actions silently drops/empties values that contain a secret substring).
+          BUILD_ARGS_INPUT="${{ inputs.BUILD_ARGS }}"
+          BUILD_ARGS_INPUT="${BUILD_ARGS_INPUT//"{{REGISTRY}}"/$REGISTRY}"
+          BUILD_SECRET_ARGS="${BUILD_SECRET_ARGS//"{{REGISTRY}}"/$REGISTRY}"
 
           process_args() {
             local input="$1"
@@ -211,7 +218,7 @@ jobs:
             done
           }
 
-          process_args "${{ inputs.BUILD_ARGS }}" "--build-arg" FORMATTED_ARGS
+          process_args "$BUILD_ARGS_INPUT" "--build-arg" FORMATTED_ARGS
           process_args "$BUILD_SECRET_ARGS" "--secret-build-arg" FORMATTED_SECRET_ARGS
 
           echo "formatted_args=$FORMATTED_ARGS" >> $GITHUB_OUTPUT
