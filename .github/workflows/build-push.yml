@@ -25,6 +25,11 @@ on:
         type: string
         default: "./Dockerfile"
         description: "Path to Dockerfile"
+      BUILD_CONTEXT:
+        required: false
+        type: string
+        default: "."
+        description: "Build context directory, relative to repo root"
       BUILD_ARGS:
         required: false
         type: string
@@ -45,6 +50,9 @@ on:
         required: true
       SELISE_GITHUB_PAT:
         required: true
+      BUILD_SECRET_ARGS:
+        required: false
+        description: 'Secret build arguments in KEY=value format (same as BUILD_ARGS input but for sensitive values)'
 
     outputs:
       image_tag:
@@ -59,6 +67,9 @@ on:
       semantic_tag:
         description: "Semantic tag"
         value: ${{ jobs.build-and-push.outputs.semantic_tag }}
+      full_image:
+        description: "Full image reference (registry/container:tag)"
+        value: ${{ jobs.build-and-push.outputs.full_image }}
 
 jobs:
   build-and-push:
@@ -72,6 +83,7 @@ jobs:
       container_name: ${{ steps.generate-tag.outputs.container_name }}
       commit_tag: ${{ steps.generate-tag.outputs.commit_tag }}
       semantic_tag: ${{ steps.generate-tag.outputs.semantic_tag }}
+      full_image: ${{ steps.generate-tag.outputs.full_path }}
 
     steps:
       - name: Checkout code
@@ -181,31 +193,31 @@ jobs:
 
       - name: Prepare Build Arguments
         id: build-args
+        env:
+          BUILD_SECRET_ARGS: ${{ secrets.BUILD_SECRET_ARGS }}
         run: |
-          # Process BUILD_ARGS input
-          BUILD_ARGS_INPUT="${{ inputs.BUILD_ARGS }}"
+          FORMATTED_ARGS=""
+          FORMATTED_SECRET_ARGS=""
 
-          if [ -z "$BUILD_ARGS_INPUT" ]; then
-            echo "formatted_args=" >> $GITHUB_OUTPUT
-            echo "No additional build arguments"
-          else
-            # Convert space-separated key=value pairs to --build-arg format
-            # Supports: "KEY1=value1 KEY2=value2" or multiline format
-            FORMATTED_ARGS=""
-            
-            # Replace newlines with spaces
-            BUILD_ARGS_INPUT=$(echo "$BUILD_ARGS_INPUT" | tr '\n' ' ')
-            
-            # Process each KEY=value pair
-            for arg in $BUILD_ARGS_INPUT; do
+          process_args() {
+            local input="$1"
+            local flag="$2"
+            local -n out_var="$3"
+            input=$(echo "$input" | tr '\n' ' ')
+            for arg in $input; do
               if [[ $arg == *"="* ]]; then
-                FORMATTED_ARGS="$FORMATTED_ARGS --build-arg $arg"
+                out_var="$out_var $flag $arg"
               fi
             done
-            
-            echo "formatted_args=$FORMATTED_ARGS" >> $GITHUB_OUTPUT
-            echo "Build arguments: $FORMATTED_ARGS"
-          fi
+          }
+
+          process_args "${{ inputs.BUILD_ARGS }}" "--build-arg" FORMATTED_ARGS
+          process_args "$BUILD_SECRET_ARGS" "--secret-build-arg" FORMATTED_SECRET_ARGS
+
+          echo "formatted_args=$FORMATTED_ARGS" >> $GITHUB_OUTPUT
+          echo "formatted_secret_args=$FORMATTED_SECRET_ARGS" >> $GITHUB_OUTPUT
+          [ -n "$FORMATTED_ARGS" ] && echo "Build arguments prepared" || echo "No additional build arguments"
+          [ -n "$FORMATTED_SECRET_ARGS" ] && echo "Secret build arguments prepared" || echo "No secret build arguments"
 
       - name: Build and Push to ACR
         run: |
@@ -215,7 +227,8 @@ jobs:
             -g ${{ secrets.ACR_RESOURCE_GROUP }} \
             --file ${{ inputs.DOCKERFILE_PATH }} \
             ${{ steps.build-args.outputs.formatted_args }} \
-            .
+            ${{ steps.build-args.outputs.formatted_secret_args }} \
+            ${{ inputs.BUILD_CONTEXT }}
 
       - name: Add Semantic Tag
         if: steps.generate-tag.outputs.use_semantic_tag == 'true'
