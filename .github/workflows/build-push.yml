@@ -43,16 +43,25 @@ on:
 
     secrets:
       AZURE_CREDENTIALS:
-        required: true
+        required: false
       AZURE_CONTAINER_REGISTRY:
-        required: true
+        required: false
       ACR_RESOURCE_GROUP:
-        required: true
+        required: false
       SELISE_GITHUB_PAT:
         required: true
       BUILD_SECRET_ARGS:
         required: false
         description: 'Secret build arguments in KEY=value format (same as BUILD_ARGS input but for sensitive values)'
+      DOCKERHUB_USERNAME:
+        required: false
+        description: "DockerHub username. If set, image is pushed to DockerHub instead of ACR"
+      DOCKERHUB_TOKEN:
+        required: false
+        description: "DockerHub access token/password"
+      DOCKERHUB_ORG:
+        required: false
+        description: "DockerHub namespace/org prefix (e.g. blocksos)"
 
     outputs:
       image_tag:
@@ -94,7 +103,21 @@ jobs:
 
       - name: Generate Image Tags
         id: generate-tag
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          AZURE_CONTAINER_REGISTRY: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
         run: |
+          # Decide target registry: DockerHub if its username secret was passed, else ACR
+          if [ -n "$DOCKERHUB_USERNAME" ]; then
+            REGISTRY_KIND="dockerhub"
+          elif [ -n "$AZURE_CONTAINER_REGISTRY" ]; then
+            REGISTRY_KIND="acr"
+          else
+            echo "Neither DOCKERHUB_USERNAME nor AZURE_CONTAINER_REGISTRY secrets were provided; cannot determine target registry" >&2
+            exit 1
+          fi
+          echo "registry_kind=${REGISTRY_KIND}" >> $GITHUB_OUTPUT
+
           # Generate tags based on strategy
           FULL_SHA="${{ github.sha }}"
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
@@ -152,7 +175,11 @@ jobs:
               ;;
           esac
 
-          REGISTRY="${{ secrets.AZURE_CONTAINER_REGISTRY }}.azurecr.io"
+          if [ "$REGISTRY_KIND" = "dockerhub" ]; then
+            REGISTRY="${{ secrets.DOCKERHUB_ORG }}"
+          else
+            REGISTRY="${AZURE_CONTAINER_REGISTRY}.azurecr.io"
+          fi
           FULL_PATH="${REGISTRY}/${CONTAINER_NAME}:${PRIMARY_TAG}"
           SEMANTIC_FULL_PATH="${REGISTRY}/${CONTAINER_NAME}:${SEMANTIC_TAG}"
 
@@ -184,9 +211,17 @@ jobs:
           echo "**Tags Created in This Pipeline:**" >> $GITHUB_STEP_SUMMARY
 
       - name: Azure Login
+        if: steps.generate-tag.outputs.registry_kind != 'dockerhub'
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to Docker Hub
+        if: steps.generate-tag.outputs.registry_kind == 'dockerhub'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Prepare Build Arguments
         id: build-args
@@ -227,6 +262,7 @@ jobs:
           [ -n "$FORMATTED_SECRET_ARGS" ] && echo "Secret build arguments prepared" || echo "No secret build arguments"
 
       - name: Build and Push to ACR
+        if: steps.generate-tag.outputs.registry_kind != 'dockerhub'
         run: |
           az acr build \
             --image ${{ steps.generate-tag.outputs.full_path }} \
@@ -237,8 +273,19 @@ jobs:
             ${{ steps.build-args.outputs.formatted_secret_args }} \
             ${{ inputs.BUILD_CONTEXT }}
 
-      - name: Add Semantic Tag
-        if: steps.generate-tag.outputs.use_semantic_tag == 'true'
+      - name: Build and Push to Docker Hub
+        if: steps.generate-tag.outputs.registry_kind == 'dockerhub'
+        run: |
+          docker build \
+            -t ${{ steps.generate-tag.outputs.full_path }} \
+            --file ${{ inputs.DOCKERFILE_PATH }} \
+            ${{ steps.build-args.outputs.formatted_args }} \
+            ${{ steps.build-args.outputs.formatted_secret_args }} \
+            ${{ inputs.BUILD_CONTEXT }}
+          docker push ${{ steps.generate-tag.outputs.full_path }}
+
+      - name: Add Semantic Tag (ACR)
+        if: steps.generate-tag.outputs.registry_kind != 'dockerhub' && steps.generate-tag.outputs.use_semantic_tag == 'true'
         run: |
           # Import the image with an additional tag (this creates an alias, no extra storage)
           az acr import \
@@ -249,7 +296,16 @@ jobs:
 
           echo "✅ Added semantic tag: ${{ steps.generate-tag.outputs.semantic_tag }}" >> $GITHUB_STEP_SUMMARY
 
-      - name: Verify Image
+      - name: Add Semantic Tag (Docker Hub)
+        if: steps.generate-tag.outputs.registry_kind == 'dockerhub' && steps.generate-tag.outputs.use_semantic_tag == 'true'
+        run: |
+          docker tag ${{ steps.generate-tag.outputs.full_path }} ${{ steps.generate-tag.outputs.semantic_full_path }}
+          docker push ${{ steps.generate-tag.outputs.semantic_full_path }}
+
+          echo "✅ Added semantic tag: ${{ steps.generate-tag.outputs.semantic_tag }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Verify Image (ACR)
+        if: steps.generate-tag.outputs.registry_kind != 'dockerhub'
         run: |
           # Verify primary tag exists
           az acr repository show \
@@ -269,4 +325,17 @@ jobs:
           # Semantic tag (if strategy is "both")
           if [ "${{ steps.generate-tag.outputs.use_semantic_tag }}" = "true" ]; then
             echo "2. **Semantic Tag:** \`${REGISTRY}/${CONTAINER}:${{ steps.generate-tag.outputs.semantic_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Verify Image (Docker Hub)
+        if: steps.generate-tag.outputs.registry_kind == 'dockerhub'
+        run: |
+          docker manifest inspect ${{ steps.generate-tag.outputs.full_path }} > /dev/null
+
+          echo "✅ Image successfully pushed and verified" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. **Commit SHA (Primary):** \`${{ steps.generate-tag.outputs.full_path }}\`" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.generate-tag.outputs.use_semantic_tag }}" = "true" ]; then
+            echo "2. **Semantic Tag:** \`${{ steps.generate-tag.outputs.semantic_full_path }}\`" >> $GITHUB_STEP_SUMMARY
           fi

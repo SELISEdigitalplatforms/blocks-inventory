@@ -50,12 +50,20 @@ on:
         type: string
         default: "main"
         description: "GitOps repository branch"
+      IMAGE_REPOSITORY:
+        required: false
+        type: string
+        default: ""
+        description: "Full image repository (overrides ACR-based construction when provided)"
 
     secrets:
       SELISE_GITHUB_PAT:
         required: true
       AZURE_CONTAINER_REGISTRY:
-        required: true
+        required: false
+      DOCKERHUB_ORG:
+        required: false
+        description: "DockerHub namespace prefix (e.g. blocksos)"
 
 jobs:
   update-gitops:
@@ -192,12 +200,25 @@ jobs:
           cp "$VALUES_FILE" "${VALUES_FILE}.backup"
 
           # Update image repository and tag using yq (proper YAML handling)
-          REGISTRY="${{ secrets.AZURE_CONTAINER_REGISTRY }}.azurecr.io"
-          CONTAINER_NAME="${{ steps.determine-config.outputs.container_name }}"
           IMAGE_TAG="${{ steps.determine-config.outputs.final_tag }}"
+          CONTAINER_NAME="${{ steps.determine-config.outputs.container_name }}"
+          DOCKERHUB_ORG="${{ secrets.DOCKERHUB_ORG }}"
+
+          # Determine image repository: DockerHub if its org secret was passed,
+          # else an explicit override, else fall back to ACR construction
+          if [ -n "${DOCKERHUB_ORG}" ]; then
+            IMAGE_REPO="${DOCKERHUB_ORG}/${CONTAINER_NAME}"
+          elif [ -n "${{ inputs.IMAGE_REPOSITORY }}" ]; then
+            IMAGE_REPO="${{ inputs.IMAGE_REPOSITORY }}"
+          else
+            REGISTRY="${{ secrets.AZURE_CONTAINER_REGISTRY }}.azurecr.io"
+            IMAGE_REPO="${REGISTRY}/${CONTAINER_NAME}"
+          fi
+
+          echo "Using image repository: ${IMAGE_REPO}"
 
           # Use yq to update YAML fields (preserves formatting and indentation)
-          yq eval ".image.repository = \"${REGISTRY}/${CONTAINER_NAME}\"" -i "$VALUES_FILE"
+          yq eval ".image.repository = \"${IMAGE_REPO}\"" -i "$VALUES_FILE"
           yq eval ".image.tag = \"${IMAGE_TAG}\"" -i "$VALUES_FILE"
 
           # Check if file was modified
