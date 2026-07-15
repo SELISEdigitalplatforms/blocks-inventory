@@ -333,28 +333,28 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**ArgoCD will sync this change automatically**" >> $GITHUB_STEP_SUMMARY
 
-      - name: Create Deployment Tracking Issue (Optional)
-        if: steps.update-values.outputs.modified == 'true' && inputs.ENVIRONMENT == 'prod'
-        uses: actions/github-script@v8
-        with:
-          github-token: ${{ secrets.SELISE_GITHUB_PAT }}
-          script: |
-            const issue = await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `[Deployment] ${{ inputs.SERVICE_NAME }} to ${{ inputs.ENVIRONMENT }}`,
-              body: `## Deployment Information
-              
-              - **Service:** ${{ inputs.SERVICE_NAME }}
-              - **Environment:** ${{ inputs.ENVIRONMENT }}
-              - **Image Tag:** ${{ steps.determine-config.outputs.final_tag }}
-              - **Container:** ${{ steps.determine-config.outputs.container_name }}
-              - **Commit:** ${{ github.sha }}
-              - **Triggered by:** @${{ github.actor }}
-              
-              ArgoCD will automatically sync this deployment.
-              
-              [View GitOps Commit](https://github.com/${{ inputs.GITOPS_REPO }}/commits/${{ inputs.GITOPS_BRANCH }})`,
-              labels: ['deployment', '${{ inputs.ENVIRONMENT }}']
-            });
-            console.log(`Created issue #${issue.data.number}`);
+      # - name: Create Deployment Tracking Issue (Optional)
+      #   if: steps.update-values.outputs.modified == 'true' && inputs.ENVIRONMENT == 'prod'
+      #   uses: actions/github-script@v8
+      #   with:
+      #     github-token: ${{ secrets.SELISE_GITHUB_PAT }}
+      #     script: |
+      #       const issue = await github.rest.issues.create({
+      #         owner: context.repo.owner,
+      #         repo: context.repo.repo,
+      #         title: `[Deployment] ${{ inputs.SERVICE_NAME }} to ${{ inputs.ENVIRONMENT }}`,
+      #         body: `## Deployment Information
+
+      #         - **Service:** ${{ inputs.SERVICE_NAME }}
+      #         - **Environment:** ${{ inputs.ENVIRONMENT }}
+      #         - **Image Tag:** ${{ steps.determine-config.outputs.final_tag }}
+      #         - **Container:** ${{ steps.determine-config.outputs.container_name }}
+      #         - **Commit:** ${{ github.sha }}
+      #         - **Triggered by:** @${{ github.actor }}
+
+      #         ArgoCD will automatically sync this deployment.
+
+      #         [View GitOps Commit](https://github.com/${{ inputs.GITOPS_REPO }}/commits/${{ inputs.GITOPS_BRANCH }})`,
+      #         labels: ['deployment', '${{ inputs.ENVIRONMENT }}']
+      #       });
+      #       console.log(`Created issue #${issue.data.number}`);
