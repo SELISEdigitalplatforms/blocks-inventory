@@ -22,3 +22,4 @@ blocksos/blocks-localization-net-worker:d8d84ab-28-26.05.1
 blocksos/blocks-localization-net-worker:aa4dd46-28-26.05.4
 blocksos/blocks-localization-net-worker:ad38343-28-26.06.1
 blocksos/blocks-localization-net-worker:b25045d-28-26.06.4
+blocksos/blocks-localization-net-worker:46d1f81-28-26.07.3
