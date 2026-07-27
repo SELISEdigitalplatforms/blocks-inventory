@@ -24,3 +24,4 @@ blocksos/blocks-uds-net-api:fa03aa1-188-26.07.6
 blocksos/blocks-uds-net-api:4853f20-188-26.07.8
 blocksos/blocks-uds-net-api:4853f20-188-26.07.10
 blocksos/blocks-uds-net-api:4853f20-188-26.07.11
+blocksos/blocks-uds-net-api:4f40887-28-26.07.12
