@@ -14,3 +14,4 @@ blocksos/blocks-communication-net-api:4357b1a--26.03.7
 blocksos/blocks-communication-net-api:f794f33-53-26.03.8
 blocksos/blocks-communication-net-api:ade2d45-56-26.04.1
 blocksos/blocks-communication-net-api:ddc0752-56-26.04.3
+blocksos/blocks-communication-net-api:510ab75-27-26.07.1
