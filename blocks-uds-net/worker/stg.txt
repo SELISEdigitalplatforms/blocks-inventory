@@ -21,3 +21,4 @@ blocksos/blocks-uds-net-worker:3a49e38-179-26.04.34
 blocksos/blocks-uds-net-worker:e1d1d0f-185-26.04.41
 blocksos/blocks-uds-net-worker:9cbd426-188-26.07.1
 blocksos/blocks-uds-net-worker:dd5dee4-188-26.07.5
+blocksos/blocks-uds-net-worker:fa03aa1-188-26.07.6
