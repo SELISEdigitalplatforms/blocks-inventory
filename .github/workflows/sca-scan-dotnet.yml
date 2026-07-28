@@ -378,7 +378,6 @@ jobs:
             -r /app \
             -o /output/${{ inputs.SBOM_FILENAME }} \
             -t dotnet \
-            --deep \
             $FORMULATION_FLAG
 
           # Move SBOM to workspace
@@ -402,7 +401,6 @@ jobs:
             -o ${{ inputs.SBOM_FILENAME }} \
             -t dotnet \
             --spec-version 1.6 \
-            --deep \
             $FORMULATION_FLAG \
             .
 
