@@ -51,3 +51,4 @@ blocksos/blocks-idp-net-worker:4132bb2-173-26.07.8
 blocksos/blocks-idp-net-worker:0261e24-175-26.07.11
 blocksos/blocks-idp-net-worker:87896d0-175-26.07.15
 blocksos/blocks-idp-net-worker:d528524-175-26.07.20
+blocksos/blocks-idp-net-worker:e961e8b-175-26.07.22
