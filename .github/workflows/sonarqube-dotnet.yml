@@ -93,6 +93,42 @@ jobs:
   sonarqube-dotnet-analysis:
     name: SonarQube .NET Analysis
     runs-on: ubuntu-latest
+
+    # Blocks .NET suites talk to real MongoDB, Redis and RabbitMQ on localhost
+    # default ports, so without these every service-backed test fails with
+    # "Connection refused" and takes the whole job down. No credentials are set:
+    # the tests use anonymous localhost connections and RabbitMQ's guest user.
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+      redis:
+        image: redis:7.4
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+      rabbitmq:
+        image: rabbitmq:3.13-management
+        ports:
+          - 5672:5672
+          - 15672:15672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 12
     permissions:
       contents: read
       pull-requests: write
