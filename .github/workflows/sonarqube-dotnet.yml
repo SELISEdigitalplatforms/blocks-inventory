@@ -69,6 +69,12 @@ on:
         description: "Skip the SonarQube Quality Gate check"
         default: false
 
+      SONAR_TARGET_BRANCH:
+        required: false
+        type: string
+        description: "Long-lived branch this analysis is compared against (e.g. dev). SonarScanner for MSBuild does not auto-detect branch/PR context, so without this the analysis targets the project's default main branch. Leave empty to keep the previous behaviour."
+        default: ""
+
       NUGET_SOURCES:
         required: false
         type: string
@@ -188,13 +194,29 @@ jobs:
         shell: bash
         run: |
           echo "SonarQube Host: ${{ inputs.SONARQUBE_HOST }}"
+          # SonarScanner for MSBuild does not read GitHub's PR context, so branch
+          # and pull-request properties have to be passed explicitly. Without
+          # them the analysis targets the project's default main branch.
+          BRANCH_ARGS=()
+          if [ -n "${{ inputs.SONAR_TARGET_BRANCH }}" ]; then
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              BRANCH_ARGS+=("/d:sonar.pullrequest.key=${{ github.event.pull_request.number }}")
+              BRANCH_ARGS+=("/d:sonar.pullrequest.branch=${{ github.head_ref }}")
+              BRANCH_ARGS+=("/d:sonar.pullrequest.base=${{ inputs.SONAR_TARGET_BRANCH }}")
+            else
+              BRANCH_ARGS+=("/d:sonar.branch.name=${GITHUB_REF_NAME}")
+            fi
+            echo "Branch args: ${BRANCH_ARGS[*]}"
+          fi
+
           dotnet-sonarscanner begin \
               /k:"${{ inputs.SONAR_PROJECT_KEY }}" \
               /o:"${{ inputs.SONAR_ORGANIZATION }}" \
               /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
               /d:sonar.host.url="${{ inputs.SONARQUBE_HOST }}" \
               /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml \
-              /d:sonar.sources.exclusions="**/obj/**,**/bin/**,**/Migrations/**"
+              /d:sonar.sources.exclusions="**/obj/**,**/bin/**,**/Migrations/**" \
+              "${BRANCH_ARGS[@]}"
 
           # NuGet Configuration Priority:
           # 1. config/*.config folder (validated as NuGet config)
