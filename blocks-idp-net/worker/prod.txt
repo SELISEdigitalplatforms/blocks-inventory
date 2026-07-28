@@ -13,3 +13,4 @@ blocksos/blocks-idp-net-worker:066a127-158-26.06.3
 blocksos/blocks-idp-net-worker:7a3411e-07-26.07.1
 blocksos/blocks-idp-net-worker:0261e24-175-26.07.11
 blocksos/blocks-idp-net-worker:87896d0-175-26.07.15
+blocksos/blocks-idp-net-worker:d528524-175-26.07.20
