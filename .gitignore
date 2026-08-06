@@ -1,0 +1,24 @@
+
+# --- open-source baseline: secrets, build output, local agent files ---
+.env
+.env.*
+!.env.example
+node_modules/
+bin/
+obj/
+dist/
+build/
+out/
+coverage/
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+QWEN.md
+.cursorrules
+.clinerules
+.windsurfrules
+graphify-out/
+results/
+.sonarqube/
+scripts/scan.sh
+*-secrets.json
