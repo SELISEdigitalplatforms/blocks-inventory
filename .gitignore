@@ -24,3 +24,17 @@ copilot-instructions.md
 !CONTRIBUTING.md
 !SECURITY.md
 !CODE_OF_CONDUCT.md
+
+# --- local AI / scan workspace (do not commit) ---
+results/
+.sonarqube/
+scripts/scan.sh
+*-secrets.json
+.env
+.env.*
+!.env.example
+
+# --- AI agent instruction files (do not commit) ---
+QWEN.md
+.clinerules
+.windsurfrules
