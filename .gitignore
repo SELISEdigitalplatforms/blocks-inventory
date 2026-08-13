@@ -1,0 +1,48 @@
+
+# --- AI assistant artifacts: never track ---
+.claude/
+.cursor/
+.codex/
+.hermes/
+.aider*
+.windsurf/
+.gemini/
+.kiro/
+.trae/
+graphify-out/
+CLAUDE.md
+GEMINI.md
+AGENTS.md
+.cursorrules
+.mcp.json
+copilot-instructions.md
+
+# --- markdown policy: only standard docs tracked ---
+*.md
+!README.md
+!LICENSE.md
+!CONTRIBUTING.md
+!SECURITY.md
+!CODE_OF_CONDUCT.md
+
+# --- local AI / scan workspace (do not commit) ---
+results/
+.sonarqube/
+scripts/scan.sh
+*-secrets.json
+.env
+.env.*
+!.env.example
+
+# --- AI agent instruction files (do not commit) ---
+QWEN.md
+.clinerules
+.windsurfrules
+
+# --- local tooling scripts (Windows + bash) - do not commit ---
+scripts/scan.ps1
+scripts/deploy.sh
+scripts/deploy.ps1
+scripts/th_transform.py
+scripts/secrets.local.ps1
+deploy.log
