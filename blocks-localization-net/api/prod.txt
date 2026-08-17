@@ -11,3 +11,4 @@ blocksos/blocks-localization-net-api:aa4dd46-28-26.05.4
 blocksos/blocks-localization-net-api:ad38343-28-26.06.1
 blocksos/blocks-localization-net-api:b25045d-28-26.06.4
 blocksos/blocks-localization-net-api:46d1f81-28-26.07.3
+blocksos/blocks-localization-net-api:19a8c7d-28-26.08.3
