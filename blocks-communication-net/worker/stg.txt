@@ -15,3 +15,4 @@ blocksos/blocks-communication-net-worker:f794f33-53-26.03.8
 blocksos/blocks-communication-net-worker:ade2d45-56-26.04.1
 blocksos/blocks-communication-net-worker:ddc0752-56-26.04.3
 blocksos/blocks-communication-net-worker:880865f-27-26.08.6
+blocksos/blocks-communication-net-worker:25dc913-27-26.08.10
