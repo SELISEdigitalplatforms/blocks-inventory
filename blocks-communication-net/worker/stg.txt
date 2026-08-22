@@ -17,3 +17,4 @@ blocksos/blocks-communication-net-worker:ddc0752-56-26.04.3
 blocksos/blocks-communication-net-worker:880865f-27-26.08.6
 blocksos/blocks-communication-net-worker:25dc913-27-26.08.10
 blocksos/blocks-communication-net-worker:a3fdf4d-27-26.08.13
+blocksos/blocks-communication-net-worker:1e28ac6-27-26.08.16
