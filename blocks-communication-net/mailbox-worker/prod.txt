@@ -5,3 +5,4 @@ blocksos/blocks-communication-net-mailbox-worker:ddc0752-56-26.04.3
 blocksos/blocks-communication-net-mailbox-worker:510ab75-27-26.07.1
 blocksos/blocks-communication-net-mailbox-worker:880865f-27-26.08.5
 blocksos/blocks-communication-net-mailbox-worker:25dc913-27-26.08.9
+blocksos/blocks-communication-net-mailbox-worker:1c407ab-77-26.08.17
