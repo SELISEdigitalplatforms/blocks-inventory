@@ -18,3 +18,4 @@ blocksos/blocks-communication-net-mailbox-worker:880865f-27-26.08.5
 blocksos/blocks-communication-net-mailbox-worker:25dc913-27-26.08.9
 blocksos/blocks-communication-net-mailbox-worker:a3fdf4d-27-26.08.12
 blocksos/blocks-communication-net-mailbox-worker:1e28ac6-27-26.08.15
+blocksos/blocks-communication-net-mailbox-worker:1c407ab-77-26.08.17
