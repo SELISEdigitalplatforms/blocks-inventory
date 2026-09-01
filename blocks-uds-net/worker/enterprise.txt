@@ -2,3 +2,4 @@ blocksos/blocks-uds-net-worker:0a450b6--26.03.6
 blocksos/blocks-uds-net-worker:a42e373-96-26.03.8
 blocksos/blocks-uds-net-worker:087995c-113-26.03.22
 blocksos/blocks-uds-net-worker:e1d1d0f-185-26.04.41
+blocksos/blocks-uds-net-worker:ebc8a95-204-26.08.4
