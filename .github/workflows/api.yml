@@ -239,6 +239,10 @@ jobs:
           TARGET_ENVS="stg prod"
 
           for TARGET_ENV in ${TARGET_ENVS}; do
+            # Reduce push collisions when multiple workflows update inventory
+            echo "Sleeping 15s to reduce push conflicts..."
+            sleep 15
+
             git checkout main
             git pull --rebase origin main
 
@@ -252,8 +256,24 @@ jobs:
             if [ "${TARGET_ENV}" = "stg" ]; then
               git add "${TARGET_FILE}"
               git commit -m "Update ${SERVICE_NAME}-${SERVICE_TYPE} ${TARGET_ENV} to ${semantic_version}" || true
-              git pull --rebase origin main
-              git push origin main
+
+              MAX_RETRIES=5
+              RETRY=0
+              BASE_DELAY=3
+              while [ $RETRY -lt $MAX_RETRIES ]; do
+                if git pull --rebase origin main && git push origin main; then
+                  break
+                fi
+                RETRY=$((RETRY + 1))
+                if [ $RETRY -lt $MAX_RETRIES ]; then
+                  WAIT=$((BASE_DELAY * RETRY + RANDOM % 3))
+                  echo "Push failed, retrying in ${WAIT}s..."
+                  sleep $WAIT
+                else
+                  echo "Failed to push after $MAX_RETRIES attempts" >&2
+                  exit 1
+                fi
+              done
             else
               if [ -z "${PR_NUM}" ]; then
                 echo "PR_NUMBER is required for prod updates; skipping." >&2
@@ -264,8 +284,25 @@ jobs:
               git checkout -B "${BRANCH_NAME}" main
               git add "${TARGET_FILE}"
               git commit -m "Update ${SERVICE_NAME}-${SERVICE_TYPE} ${TARGET_ENV} to ${semantic_version}" || true
-              git pull --rebase origin "${BRANCH_NAME}" || true
-              git push origin "${BRANCH_NAME}"
+
+              MAX_RETRIES=5
+              RETRY=0
+              BASE_DELAY=3
+              while [ $RETRY -lt $MAX_RETRIES ]; do
+                git pull --rebase origin "${BRANCH_NAME}" || true
+                if git push origin "${BRANCH_NAME}"; then
+                  break
+                fi
+                RETRY=$((RETRY + 1))
+                if [ $RETRY -lt $MAX_RETRIES ]; then
+                  WAIT=$((BASE_DELAY * RETRY + RANDOM % 3))
+                  echo "Push failed, retrying in ${WAIT}s..."
+                  sleep $WAIT
+                else
+                  echo "Failed to push after $MAX_RETRIES attempts" >&2
+                  exit 1
+                fi
+              done
 
               curl -s -o /tmp/pr.json -w "%{http_code}" \
                 -H "Authorization: Bearer ${GH_TOKEN}" \
