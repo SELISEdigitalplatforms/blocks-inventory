@@ -267,6 +267,7 @@ jobs:
                 if git pull --rebase origin main && git push origin main; then
                   break
                 fi
+                git rebase --abort 2>/dev/null || true
                 RETRY=$((RETRY + 1))
                 if [ $RETRY -lt $MAX_RETRIES ]; then
                   WAIT=$((BASE_DELAY * RETRY + RANDOM % 3))
@@ -284,28 +285,17 @@ jobs:
               fi
 
               BRANCH_NAME="${SERVICE_NAME}-${SERVICE_TYPE}-${PR_NUM}-${TARGET_ENV}"
+              # This branch only ever needs to carry one commit for a single-use
+              # PR. Reusing a stale remote branch across runs let it accumulate
+              # months of divergence from main, which turned into unrelated-
+              # looking rebase conflicts on every later run. Always start it
+              # fresh from current main instead of reconciling with whatever a
+              # previous run left behind.
+              git push origin --delete "${BRANCH_NAME}" 2>/dev/null || true
               git checkout -B "${BRANCH_NAME}" main
               git add "${TARGET_FILE}"
               git commit -m "Update ${SERVICE_NAME}-${SERVICE_TYPE} ${TARGET_ENV} to ${semantic_version}" || true
-
-              MAX_RETRIES=5 
-              RETRY=0
-              BASE_DELAY=3
-              while [ $RETRY -lt $MAX_RETRIES ]; do
-                git pull --rebase origin "${BRANCH_NAME}" || true
-                if git push origin "${BRANCH_NAME}"; then
-                  break
-                fi
-                RETRY=$((RETRY + 1))
-                if [ $RETRY -lt $MAX_RETRIES ]; then
-                  WAIT=$((BASE_DELAY * RETRY + RANDOM % 3))
-                  echo "Push failed, retrying in ${WAIT}s..."
-                  sleep $WAIT
-                else
-                  echo "Failed to push after $MAX_RETRIES attempts" >&2
-                  exit 1
-                fi
-              done
+              git push --force origin "${BRANCH_NAME}"
 
               curl -s -o /tmp/pr.json -w "%{http_code}" \
                 -H "Authorization: Bearer ${GH_TOKEN}" \
