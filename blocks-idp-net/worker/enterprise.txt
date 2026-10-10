@@ -1,3 +1,4 @@
 blocksos/blocks-idp-net-worker:6b0b67e-41-26.02.25
 blocksos/blocks-idp-net-worker:c59261f-53-26.02.44
 blocksos/blocks-idp-net-worker:f36b115-145-26.04.31
+blocksos/blocks-idp-net-worker:09c6e99-199-26.08.2
