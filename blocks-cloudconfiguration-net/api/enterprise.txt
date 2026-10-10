@@ -1,3 +1,4 @@
 blocksos/blocks-cloudconfiguration-net-api:21747c2-30-26.02.10
 blocksos/blocks-cloudconfiguration-net-api:a4d921a-35-26.03.5
 blocksos/blocks-cloudconfiguration-net-api:c83a32e-40-26.04.3
+blocksos/blocks-cloudconfiguration-net-api:ca152a7-46-26.07.4
