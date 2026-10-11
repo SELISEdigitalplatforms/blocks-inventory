@@ -435,6 +435,56 @@ jobs:
         with:
           scanMetadataReportFile: ./sonar-report/report-task.txt
 
+      - name: Print Quality Gate Details
+        if: always() && steps.quality-gate.outcome != 'skipped'
+        continue-on-error: true
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ inputs.SONARQUBE_HOST }}
+          PROJECT_KEY: ${{ inputs.SONAR_PROJECT_KEY }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          api() { curl -sSf -u "$SONAR_TOKEN:" "${SONAR_HOST_URL%/}/api/$1"; }
+
+          task_id=$(sed -n 's/^ceTaskId=//p' ./sonar-report/report-task.txt)
+          analysis_id=$(api "ce/task?id=$task_id" | jq -r '.task.analysisId')
+
+          echo "=== Quality Gate conditions ==="
+          conditions=$(api "qualitygates/project_status?analysisId=$analysis_id")
+          echo "$conditions" | jq -r '
+            .projectStatus.conditions[]
+            | "\(.status)\t\(.metricKey)\tactual=\(.actualValue // "-")\t\(.comparator) \(.errorThreshold)"' \
+            | column -t -s $'\t'
+
+          {
+            echo "### Quality Gate Conditions"
+            echo ""
+            echo "| Status | Metric | Actual | Threshold |"
+            echo "|---|---|---|---|"
+            echo "$conditions" | jq -r '
+              .projectStatus.conditions[]
+              | "| \(if .status == "OK" then "✅" else "❌" end) \(.status) | `\(.metricKey)` | \(.actualValue // "-") | \(.comparator) \(.errorThreshold) |"'
+            echo ""
+          } >> $GITHUB_STEP_SUMMARY
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            scope="pullRequest=$PR_NUMBER"
+          else
+            scope="branch=$BRANCH_NAME"
+          fi
+
+          echo ""
+          echo "=== Open issues on new code ($scope) ==="
+          issues=$(api "issues/search?componentKeys=$PROJECT_KEY&$scope&inNewCodePeriod=true&resolved=false&ps=500")
+          echo "Total: $(echo "$issues" | jq -r '.total')"
+          echo "$issues" | jq -r '
+            .issues[]
+            | "\(.severity)\t\(.type)\t\(.rule)\t\(.component | sub("^[^:]*:"; "")):\(.line // "-")\t\(.message)"' \
+            | column -t -s $'\t'
       - name: Quality Gate Summary
         if: always()
         shell: bash
