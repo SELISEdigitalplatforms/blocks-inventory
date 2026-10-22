@@ -40,6 +40,11 @@ on:
         type: string
         default: "both"
         description: 'Tagging strategy: "both" (semantic + commit), "semantic", or "commit"'
+      SUBMODULE_BRANCH:
+        required: false
+        type: string
+        default: ""
+        description: "If set, every submodule is updated to the tip of this branch. Empty = use the SHA pinned in the repo"
 
     secrets:
       AZURE_CREDENTIALS:
@@ -98,8 +103,20 @@ jobs:
           token: ${{ secrets.SELISE_GITHUB_PAT }}
 
       - name: Update submodules
+        env:
+          SUBMODULE_BRANCH: ${{ inputs.SUBMODULE_BRANCH }}
         run: |
-          git submodule update --init --recursive
+          if [ -n "$SUBMODULE_BRANCH" ]; then
+            # Point every submodule at the requested branch (working tree only, not committed)
+            for name in $(git config -f .gitmodules --name-only --get-regexp '^submodule\..*\.path$' | sed -e 's/^submodule\.//' -e 's/\.path$//'); do
+              git config -f .gitmodules "submodule.${name}.branch" "$SUBMODULE_BRANCH"
+            done
+            git submodule sync --recursive
+            git submodule update --init --recursive --remote
+            git submodule status
+          else
+            git submodule update --init --recursive
+          fi
 
       - name: Generate Image Tags
         id: generate-tag
