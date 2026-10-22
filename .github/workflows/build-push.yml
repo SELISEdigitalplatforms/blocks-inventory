@@ -112,6 +112,8 @@ jobs:
               git config -f .gitmodules "submodule.${name}.branch" "$SUBMODULE_BRANCH"
             done
             git submodule sync --recursive
+            # checkout clones submodules shallow (pinned SHA only), so origin/<branch> doesn't exist yet
+            git submodule foreach --quiet 'git fetch --depth=1 origin "+refs/heads/$SUBMODULE_BRANCH:refs/remotes/origin/$SUBMODULE_BRANCH"'
             git submodule update --init --recursive --remote
             git submodule status
           else
