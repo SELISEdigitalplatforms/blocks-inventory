@@ -99,22 +99,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          submodules: "true"
+          # when tracking a branch, skip pinned-SHA fetch (stale pins break checkout); next step inits submodules
+          submodules: ${{ inputs.SUBMODULE_BRANCH == '' && 'true' || 'false' }}
           token: ${{ secrets.SELISE_GITHUB_PAT }}
 
       - name: Update submodules
         env:
           SUBMODULE_BRANCH: ${{ inputs.SUBMODULE_BRANCH }}
+          SELISE_GITHUB_PAT: ${{ secrets.SELISE_GITHUB_PAT }}
         run: |
           if [ -n "$SUBMODULE_BRANCH" ]; then
+            # checkout skipped submodules, so give git the PAT for private submodule remotes
+            git config --global url."https://x-access-token:${SELISE_GITHUB_PAT}@github.com/".insteadOf "https://github.com/"
             # Point every submodule at the requested branch (working tree only, not committed)
             for name in $(git config -f .gitmodules --name-only --get-regexp '^submodule\..*\.path$' | sed -e 's/^submodule\.//' -e 's/\.path$//'); do
               git config -f .gitmodules "submodule.${name}.branch" "$SUBMODULE_BRANCH"
             done
             git submodule sync --recursive
-            # checkout clones submodules shallow (pinned SHA only), so origin/<branch> doesn't exist yet
-            git submodule foreach --quiet 'git fetch --depth=1 origin "+refs/heads/$SUBMODULE_BRANCH:refs/remotes/origin/$SUBMODULE_BRANCH"'
-            git submodule update --init --recursive --remote
+            # --remote fetches the branch tip directly, never the pinned SHA
+            git submodule update --init --recursive --remote --depth 1
             git submodule status
           else
             git submodule update --init --recursive
