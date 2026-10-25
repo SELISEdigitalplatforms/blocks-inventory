@@ -116,8 +116,9 @@ jobs:
               git config -f .gitmodules "submodule.${name}.branch" "$SUBMODULE_BRANCH"
             done
             git submodule sync --recursive
-            # --remote fetches the branch tip directly, never the pinned SHA
-            git submodule update --init --recursive --remote --depth 1
+            # --remote follows the branch tip, never the pinned SHA; --no-single-branch so a shallow
+            # clone also gets origin/<branch> when it isn't the submodule's default branch
+            git submodule update --init --recursive --remote --depth 1 --no-single-branch
             git submodule status
           else
             git submodule update --init --recursive
