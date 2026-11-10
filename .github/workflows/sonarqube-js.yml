@@ -135,7 +135,7 @@ jobs:
           echo "✅ Submodules updated" >> $GITHUB_STEP_SUMMARY
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ inputs.NODE_VERSION }}
           cache: ${{ inputs.PACKAGE_MANAGER }}
