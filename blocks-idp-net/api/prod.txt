@@ -17,3 +17,4 @@ blocksos/blocks-idp-net-api:d528524-175-26.07.20
 blocksos/blocks-idp-net-api:89f31cf-195-26.07.26
 blocksos/blocks-idp-net-api:896a5e3-197-26.07.30
 blocksos/blocks-idp-net-api:09c6e99-199-26.08.2
+blocksos/blocks-idp-net-api:b3e79d9-215-26.08.16
