@@ -97,7 +97,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # when tracking a branch, skip pinned-SHA fetch (stale pins break checkout); next step inits submodules
           submodules: ${{ inputs.SUBMODULE_BRANCH == '' && 'true' || 'false' }}
