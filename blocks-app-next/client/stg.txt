@@ -61,3 +61,4 @@ blocksos/blocks-app-next-client:e4965c0-3037-26.08.1
 blocksos/blocks-app-next-client:d848812-3037-26.11.1
 blocksos/blocks-app-next-client:76f7192-3037-26.11.2
 blocksos/blocks-app-next-client:07360bb-3037-26.11.3
+blocksos/blocks-app-next-client:c40d514-3037-26.11.4
